@@ -13,7 +13,31 @@
   <!-- <script src="redirect.9e0f3bb7.js"></script> -->
   <link rel="stylesheet" href="styles.8986bff4.css" type="text/css" />
   <script src="styles.8986bff4.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      const viewer = document.querySelector('urdf-viewer');
+      const dropZone = document.getElementById('drop-zone');
   
+      function updateDropZone() {
+        const urdf = viewer.getAttribute('urdf');
+        if (!urdf || urdf === "") {
+          dropZone.classList.remove('hidden');
+        } else {
+          dropZone.classList.add('hidden');
+        }
+      }
+  
+      // 初始判断一次
+      updateDropZone();
+  
+      // 监听 urdf 属性变化
+      const observer = new MutationObserver(updateDropZone);
+      observer.observe(viewer, {
+        attributes: true,
+        attributeFilter: ['urdf']
+      });
+    });
+  </script>
 </head>
 <body tabindex="0">
   <div id="menu">
@@ -92,9 +116,14 @@
         <i class="fas fa-cog mr-2 text-blue-400"></i>
         Joint Controls
       </h3>
+
       
       <ul id="joint-controls"></ul>
     </div>
+  </div>
+
+  <div id="drop-zone">
+    <p style="margin:0; padding:0; border:none; background:none; box-shadow:none;">🚀 拖入 URDF 文件或文件夹</p>
   </div>
     
   <urdf-viewer up="+Z" display-shadow="" tabindex="0"></urdf-viewer>
