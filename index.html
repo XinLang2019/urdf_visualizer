@@ -1,0 +1,106 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta charset="utf-8">
+  <title>URDF Viewer</title>
+  <script src="https://unpkg.com/@webcomponents/webcomponentsjs@2.4.3/webcomponents-bundle.js"></script>
+  <link href="https://fonts.googleapis.com/css?family=Roboto:100,300" rel="stylesheet"> 
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- <script src="redirect.9e0f3bb7.js"></script> -->
+  <link rel="stylesheet" href="styles.8986bff4.css" type="text/css" />
+  <script src="styles.8986bff4.js"></script>
+  
+</head>
+<body tabindex="0">
+  <div id="menu">
+    <div class="flex items-center mb-4">
+      <i class="fas fa-robot text-2xl mr-3 text-indigo-400"></i>
+      <h1 class="text-xl font-light text-black">URDF Viewer</h1>
+    </div>
+
+    <div id="current-urdf-name" style="font-size: 18px; color: #111010;">Current model: None</div>
+
+            
+    <ul id="urdf-options">
+      <li urdf="../../../urdf/anymal_c/urdf/anymal_c.urdf" color="#E91E63">
+        <i class="fas fa-walking mr-2"></i> Anymal-C
+      </li>
+      <li urdf="./urdf/anymal_b/urdf/anymal_b.URDF" color="#009688">
+        <i class="fas fa-robot mr-2"></i> Anymal-b
+      </li>
+      <li urdf="../../../urdf/go2/urdf/go2.URDF" color="#FFB300">
+        <i class="fas fa-mountain mr-2"></i> Unitree-Go2
+      </li>
+      <li urdf="../../../urdf/cassie/urdf/cassie.URDF" color="#FFB300">
+        <i class="fas fa-mountain mr-2"></i> Cassie
+      </li>
+    </ul>
+  </div>
+  
+  <div id="right-panel">
+    <div id="controls">
+      <div id="toggle-controls">
+        <i class="fas fa-chevron-up mr-2 text-xs"></i>
+        <span>Hide Controls</span>
+      </div>
+      
+      <div class="text-sm text-black-300 mb-4 flex items-center">
+        <i class="fas fa-info-circle mr-2 text-blue-400"></i>
+        Drag and drop URDF files or folders! (Chrome Only)
+      </div>
+      
+      
+      <div id="ignore-joint-limits" class="toggle checked">
+        <i class="fas fa-sliders-h mr-2"></i> Ignore Joint Limits
+      </div>
+      <div id="hide-fixed" class="toggle">
+        <i class="fas fa-eye-slash mr-2"></i> Hide Fixed Joints
+      </div>
+      <div id="radians-toggle" class="toggle">
+        <i class="fas fa-radiation mr-2"></i> Use Radians
+      </div>
+      <div id="autocenter-toggle" class="checked toggle">
+        <i class="fas fa-crosshairs mr-2"></i> Autocenter
+      </div>
+      <div id="collision-toggle" class="toggle">
+        <i class="fas fa-cube mr-2"></i> Show Collision
+      </div>
+      <div id="do-animate" class="checked toggle">
+        <i class="fas fa-play-circle mr-2"></i> Animate Joints
+      </div>
+      
+      <label class="mt-4">
+        <div class="flex items-center mb-2">
+          <i class="fas fa-arrows-alt mr-2 text-blue-400"></i>
+          <span class="text-black">Up Axis</span>
+        </div>
+        <select id="up-select">
+          <option value="+X">+X</option>
+          <option value="-X">-X</option>
+          <option value="+Y">+Y</option>
+          <option value="-Y">-Y</option>
+          <option value="+Z">+Z</option>
+          <option value="-Z" selected>-Z</option>
+        </select>
+      </label>
+      
+      <h3 class="text-sm font-medium text-black-300 mt-4 mb-2 flex items-center">
+        <i class="fas fa-cog mr-2 text-blue-400"></i>
+        Joint Controls
+      </h3>
+      
+      <ul id="joint-controls"></ul>
+    </div>
+  </div>
+    
+  <urdf-viewer up="+Z" display-shadow="" tabindex="0"></urdf-viewer>
+  
+  <script src="src.a2b27638.js"></script>
+  
+  
+</body>
+</html>
