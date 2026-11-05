@@ -49251,5 +49251,5 @@ function hmrAcceptRun(bundle, id) {
     return true;
   }
 }
-},{}]},{},["../node_modules/parcel-bundler/src/builtins/hmr-runtime.js","src/index.js"], null)
+},{}]},{},[], null)
 //# sourceMappingURL=src.a2b27638.js.map

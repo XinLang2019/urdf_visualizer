@@ -1,135 +1,103 @@
-
-
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="zh-CN">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <meta charset="utf-8">
-  <title>URDF Viewer</title>
-  <script src="https://unpkg.com/@webcomponents/webcomponentsjs@2.4.3/webcomponents-bundle.js"></script>
-  <link href="https://fonts.googleapis.com/css?family=Roboto:100,300" rel="stylesheet"> 
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- <script src="redirect.9e0f3bb7.js"></script> -->
-  <link rel="stylesheet" href="styles.8986bff4.css" type="text/css" />
-  <script src="styles.8986bff4.js"></script>
-  <script>
-    window.addEventListener('DOMContentLoaded', () => {
-      const viewer = document.querySelector('urdf-viewer');
-      const dropZone = document.getElementById('drop-zone');
-  
-      function updateDropZone() {
-        const urdf = viewer.getAttribute('urdf');
-        if (!urdf || urdf === "") {
-          dropZone.classList.remove('hidden');
-        } else {
-          dropZone.classList.add('hidden');
-        }
-      }
-  
-      // 初始判断一次
-      updateDropZone();
-  
-      // 监听 urdf 属性变化
-      const observer = new MutationObserver(updateDropZone);
-      observer.observe(viewer, {
-        attributes: true,
-        attributeFilter: ['urdf']
-      });
-    });
-  </script>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#2E6B8A">
+  <title>URDF Viewer · 机器人模型工作台</title><link rel="stylesheet" href="workbench.css">
 </head>
-<body tabindex="0">
-  <div id="menu">
-    <div class="flex items-center mb-4">
-      <i class="fas fa-robot text-2xl mr-3 text-indigo-400"></i>
-      <h1 class="text-xl font-light text-black">URDF Viewer</h1>
+<body>
+  <main id="viewport" aria-label="机器人三维视图"><urdf-viewer up="+Z" display-shadow tabindex="0" aria-label="三维模型：左键旋转，右键平移，滚轮缩放"></urdf-viewer></main>
+  <nav class="toolbar" aria-label="工作台工具栏">
+    <div class="tool-group">
+      <button data-display="visual" class="active" aria-pressed="true" data-i18n="visual">视觉</button><button data-display="collision" aria-pressed="false" data-i18n="collision">碰撞</button><button data-display="inertia" aria-pressed="false" data-i18n="inertia">惯量</button><button data-display="com" aria-pressed="false" data-i18n="com">质心</button><button data-display="axes" aria-pressed="false" data-i18n="axes">坐标轴</button><button data-display="jointAxes" aria-pressed="false" data-i18n="jointAxes">关节轴</button><button data-display="shadow" class="active" aria-pressed="true" data-i18n="shadow">阴影</button><button data-display="lighting" class="active" aria-pressed="true" data-i18n="lighting">光照</button><button data-display="grid" class="active" aria-pressed="true" data-i18n="grid">网格</button>
     </div>
-
-    <div id="current-urdf-name" style="font-size: 18px; color: #111010;">Current model: None</div>
-
-            
-    <ul id="urdf-options">
-      <li urdf="./urdf/anymal_c/urdf/anymal_c.urdf" color="#E91E63">
-        <i class="fas fa-walking mr-2"></i> Anymal-C
-      </li>
-      <li urdf="./urdf/Panda/urdf/Panda.urdf" color="#009688">
-        <i class="fas fa-robot mr-2"></i> Anymal-b
-      </li>
-      <li urdf="urdf/go2/urdf/go2.urdf" color="#FFB300">
-        <i class="fas fa-mountain mr-2"></i> Unitree-Go2
-      </li>
-      <li urdf="urdf/cassie/urdf/cassie.urdf" color="#FFB300">
-        <i class="fas fa-mountain mr-2"></i> Cassie
-      </li>
-    </ul>
-  </div>
-  
-  <div id="right-panel">
-    <div id="controls">
-      <div id="toggle-controls">
-        <i class="fas fa-chevron-up mr-2 text-xs"></i>
-        <span>Hide Controls</span>
+    <div class="tool-group"><select id="up-select" aria-label="向上轴"><option>+Z</option><option>-Z</option><option>+Y</option><option>-Y</option><option>+X</option><option>-X</option></select><button id="fit-view" title="适应视图 (F)" aria-label="适应视图">⌖</button></div>
+    <div class="tool-group"><button id="workspace-toggle" class="active" aria-pressed="true" aria-controls="workspace-sidebar" data-i18n="workspace">工作栏</button><button id="statics-toggle" aria-pressed="false" data-i18n="statics">受力分析</button><button id="animate" aria-pressed="false" data-i18n="animate">动画</button><button data-panel="editor" class="active" aria-pressed="true" data-i18n="editor">编辑</button></div>
+    <div class="tool-group"><button id="help" data-i18n="help">帮助</button><button id="language" title="Switch language">EN</button><button id="theme" title="切换明暗主题" aria-label="切换明暗主题">☾</button></div>
+  </nav>
+  <section id="workspace-sidebar" class="workspace-sidebar" aria-label="模型工作栏">
+    <nav class="workspace-tabs" aria-label="模型工具">
+      <div role="tablist" aria-label="文件、关节和结构">
+        <button id="tab-files" data-panel="files" role="tab" aria-selected="true" aria-controls="files-panel" class="active" data-i18n="files">文件</button>
+        <button id="tab-joints" data-panel="joints" role="tab" aria-selected="false" aria-controls="joints-panel" tabindex="-1" data-i18n="joints">关节</button>
+        <button id="tab-structure" data-panel="structure" role="tab" aria-selected="false" aria-controls="structure-panel" tabindex="-1" data-i18n="structure">结构</button>
       </div>
-      
-      <div class="text-sm text-black-300 mb-4 flex items-center">
-        <i class="fas fa-info-circle mr-2 text-blue-400"></i>
-        Drag and drop URDF files or folders! (Chrome Only)
+      <button id="sidebar-toggle" aria-label="收起工作栏" title="收起 / 展开工作栏" aria-expanded="true" aria-controls="workspace-content">‹</button>
+    </nav>
+    <div id="workspace-content" class="workspace-content">
+  <aside id="files-panel" class="panel panel-files" role="tabpanel" aria-labelledby="tab-files">
+    <header class="panel-header"><h2 id="files-title" data-i18n="files">文件</h2><span class="header-actions"><button id="file-tools-toggle" aria-label="加载其他模型" aria-expanded="false" title="加载其他模型" hidden>＋</button><button data-collapse="files" aria-label="折叠文件面板">▱</button><button data-close="files" aria-label="关闭文件面板">×</button></span></header>
+    <div class="panel-body file-body">
+      <div class="import-area"><div class="upload-icon" aria-hidden="true">↥</div><p data-i18n="dropHint">拖拽机器人模型文件或文件夹到页面任意位置</p><p class="muted" data-i18n="orLoad">或点击下面的按钮加载</p><div class="button-row"><button id="load-files" data-i18n="loadFile">加载文件</button><button id="load-folder" data-i18n="loadFolder">加载文件夹</button></div></div>
+      <div id="file-tree" role="tree" aria-label="模型文件目录" hidden></div>
+      <div id="loaded-file" hidden><span class="file-symbol">◇</span><div><strong id="model-name"></strong><span id="model-meta" class="muted"></span></div><span class="loaded-dot" title="已加载"></span></div>
+      <div class="example-section"><label for="example-select" data-i18n="examples">内置示例</label><div class="example-row"><select id="example-select" aria-label="选择示例模型"><option value="" data-i18n="chooseModel">选择机器人模型…</option><option value="urdf/anymal_c/urdf/anymal_c.urdf">ANYmal C</option><option value="urdf/anymal_b/urdf/anymal_b.urdf">ANYmal B</option><option value="urdf/go2/urdf/go2.urdf">Unitree Go2</option><option value="urdf/g1/urdf/g1.urdf" data-base="../">Unitree G1</option><option value="urdf/cassie/urdf/cassie.urdf">Cassie</option></select><button id="load-example" data-i18n="load">加载</button></div></div>
+    </div>
+  </aside>
+  <aside id="joints-panel" class="panel panel-joints" role="tabpanel" aria-labelledby="tab-joints" hidden>
+    <header class="panel-header"><h2 id="joints-title" data-i18n="joints">关节</h2><div class="joint-tools"><div class="segmented"><button id="unit-rad" class="selected" aria-pressed="true" data-i18n="radians">弧度</button><button id="unit-deg" aria-pressed="false" data-i18n="degrees">角度</button></div><button id="reset-joints" data-i18n="reset">重置</button><button id="limits" class="active" aria-pressed="true" data-i18n="limits">限位</button></div><span class="header-actions"><button id="joint-filter-toggle" aria-label="筛选关节" aria-expanded="false" title="搜索 / 固定关节">⌕</button><button data-collapse="joints" aria-label="折叠关节面板">▱</button><button data-close="joints" aria-label="关闭关节面板">×</button></span></header>
+    <div class="panel-body"><div id="joints-empty" class="empty-state" data-i18n="noModel">未加载模型</div><div id="joint-content" hidden><div class="panel-search" id="joint-filters" hidden><input id="joint-search" type="search" placeholder="搜索关节…" aria-label="搜索关节"><label class="checkbox-label"><input id="hide-fixed" type="checkbox" checked><span data-i18n="hideFixed">隐藏固定关节</span></label></div><ul id="joint-list"></ul><p id="joint-count" class="panel-footnote"></p></div></div>
+  </aside>
+  <aside id="structure-panel" class="panel panel-structure" role="tabpanel" aria-labelledby="tab-structure" hidden>
+    <header class="panel-header"><h2 id="structure-title" data-i18n="structure">结构</h2><span id="structure-count" class="count-badge" hidden></span><button id="graph-measure" class="graph-option" aria-label="两连杆测量" aria-pressed="false" title="选择两个 link 测量距离；也可 Ctrl + 点击结构节点或三维连杆" data-i18n="linkMeasure" disabled>测量</button><button id="graph-fixed" class="graph-option" aria-pressed="false" data-i18n="fixedNodes" title="显示完整的固定关节分支">固定节点</button><button id="graph-zoom-out" class="graph-fit" aria-label="缩小结构图" title="缩小结构图">−</button><button id="graph-zoom-in" class="graph-fit" aria-label="放大结构图" title="放大结构图">+</button><button id="graph-fit" class="graph-fit" aria-label="适应结构图" title="适应结构图 (双击空白处)">⌖</button><span class="header-actions"><button data-collapse="structure" aria-label="折叠结构面板">▱</button><button data-close="structure" aria-label="关闭结构面板">×</button></span></header>
+    <div class="panel-body"><div class="structure-hint" data-i18n="structureHint">点击: 选择连杆 · 右键: 隐藏 / 显示 · Ctrl + 点击视图: 测量</div><div id="structure-empty" class="empty-state" data-i18n="noModel">未加载模型</div><div id="tree" role="group" aria-label="机器人结构拓扑图" hidden></div><div id="selection-info" hidden></div><section id="link-measure-panel" aria-label="两连杆测量结果" hidden>
+        <div class="link-measure-heading"><span class="link-measure-names"><span id="link-measure-a">A: —</span><span id="link-measure-b">B: —</span></span><select id="link-measure-unit" aria-label="测量单位"><option value="mm">mm</option><option value="m">m</option></select><button id="link-measure-clear" aria-label="清除连杆测量" title="清除，重新选择">×</button></div>
+        <div id="link-measure-values"><output id="link-measure-distance">—</output><span id="link-measure-dx">ΔX —</span><span id="link-measure-dy">ΔY —</span><span id="link-measure-dz">ΔZ —</span></div>
+        <p class="link-measure-basis" data-i18n="linkMeasureBasis">连杆原点 · 场景坐标 · B − A</p>
+      </section></div>
+  </aside>
+    </div>
+    <div id="sidebar-resize" class="dock-resize-handle" role="separator" tabindex="0" aria-label="调整工作栏宽度" aria-orientation="vertical" aria-valuemin="260" aria-valuemax="440"></div>
+  </section>
+  <div id="orientation" aria-label="视图方向"><svg viewBox="0 0 110 110"><g id="gizmo-lines"></g><g id="gizmo-labels"></g></svg><span data-i18n="viewHint">点击切换视角</span></div>
+  <aside id="editor-panel" class="panel panel-editor" aria-labelledby="editor-title">
+    <div id="editor-resize" class="dock-resize-handle" role="separator" tabindex="0" aria-label="调整编辑器宽度" aria-orientation="vertical" aria-valuemin="280" aria-valuemax="600"></div>
+    <header class="panel-header"><div class="right-tabs" role="tablist" aria-label="右侧工具"><button id="right-code-tab" role="tab" aria-selected="true" aria-controls="code-workspace" class="active" data-i18n="editor">编辑</button><button id="right-statics-tab" role="tab" aria-selected="false" aria-controls="statics-workspace" tabindex="-1" data-i18n="staticsDetails">静力学</button></div><h2 id="editor-title" class="sr-only" data-i18n="editor">编辑</h2><div class="editor-tools"><button id="reload" data-i18n="reload">重新加载</button><button id="save" class="active" data-i18n="save">保存</button></div><span class="header-actions"><button data-collapse="editor" aria-label="折叠编辑面板">▱</button><button data-close="editor" aria-label="关闭编辑面板">×</button></span></header>
+    <div id="code-workspace" class="panel-body editor-body" role="tabpanel" aria-labelledby="right-code-tab"><div class="editor-meta"><input id="filename" value="newfile.urdf" aria-label="URDF 文件名" spellcheck="false"><span id="save-state" class="save-state" data-i18n="emptyFile">空白文件</span></div><div class="code-editor"><pre id="line-numbers" aria-hidden="true">1</pre><div class="source-code"><div id="source-locate-highlight" aria-hidden="true" hidden></div><pre id="source-highlight" aria-hidden="true"></pre><textarea id="source" aria-label="URDF XML 编辑器" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea></div></div><div class="editor-footer"><span id="cursor-position">Ln 1, Col 1</span><span>XML · UTF-8</span></div><p id="editor-error" role="alert" hidden></p></div>
+    <section id="statics-workspace" class="panel-body statics-body" role="tabpanel" aria-labelledby="right-statics-tab" hidden>
+      <div class="statics-heading"><strong data-i18n="staticsTitle">当前姿态 · 静力估算</strong><button id="statics-enable" data-i18n="staticsStart">开启分析</button></div>
+      <p id="statics-status" role="status">未开启</p>
+      <div id="statics-summary" class="statics-summary"></div>
+      <div class="statics-settings">
+        <label><span data-i18n="gravity">重力加速度</span><span><input id="statics-gravity" type="number" min="0.001" max="1000" step="any" value="9.81" aria-label="重力加速度"> m/s²</span></label>
+        <label><span data-i18n="groundHeight">地面高度</span><span><input id="statics-ground" type="number" step="any" value="0" aria-label="场景 Y 轴地面高度"> m <button id="statics-ground-reset" title="以当前模型最低碰撞点设置地面">↧</button></span></label>
+        <label><span data-i18n="contactTolerance">接触容差</span><span><input id="statics-tolerance" type="number" min="0.1" max="100" step="any" value="5" aria-label="接触容差"> mm</span></label>
       </div>
-      
-      
-      <div id="ignore-joint-limits" class="toggle checked">
-        <i class="fas fa-sliders-h mr-2"></i> Ignore Joint Limits
-      </div>
-      <div id="hide-fixed" class="toggle checked">
-        <i class="fas fa-eye-slash mr-2"></i> Hide Fixed Joints
-      </div>
-      <div id="radians-toggle" class="toggle">
-        <i class="fas fa-radiation mr-2"></i> Use Radians
-      </div>
-      <div id="autocenter-toggle" class="checked toggle">
-        <i class="fas fa-crosshairs mr-2"></i> Autocenter
-      </div>
-      <div id="collision-toggle" class="toggle">
-        <i class="fas fa-cube mr-2"></i> Show Collision
-      </div>
-      <div id="do-animate" class="checked toggle">
-        <i class="fas fa-play-circle mr-2"></i> Animate Joints
-      </div>
-      
-      <label class="mt-4">
-        <div class="flex items-center mb-2">
-          <i class="fas fa-arrows-alt mr-2 text-blue-400"></i>
-          <span class="text-black">Up Axis</span>
+      <details class="statics-slope-settings" open><summary data-i18n="slopeSettings">斜坡与摩擦</summary>
+        <div class="statics-settings">
+          <label><span data-i18n="slopeAngle">坡度角</span><span><input id="statics-slope-angle" type="number" min="-75" max="75" step="1" value="15" aria-label="斜坡角度"> °</span></label>
+          <label><span data-i18n="slopeHeading">坡向</span><span><input id="statics-slope-heading" type="number" min="-360" max="360" step="15" value="0" aria-label="上坡方向角"> °</span></label>
+          <label><span data-i18n="staticFriction">静摩擦系数 μ</span><input id="statics-friction" type="number" min="0" max="5" step="0.05" value="0.7" aria-label="接触静摩擦系数"></label>
         </div>
-        <select id="up-select">
-          <option value="+X">+X</option>
-          <option value="-X">-X</option>
-          <option value="+Y">+Y</option>
-          <option value="-Y">-Y</option>
-          <option value="+Z">+Z</option>
-          <option value="-Z" selected>-Z</option>
-        </select>
-      </label>
-      
-      <h3 class="text-sm font-medium text-black-300 mt-4 mb-2 flex items-center">
-        <i class="fas fa-cog mr-2 text-blue-400"></i>
-        Joint Controls
-      </h3>
+        <div class="statics-slope-actions"><button id="statics-place-slope" class="active" data-i18n="placeSlope">一键贴合斜坡</button><button id="statics-flat" data-i18n="restoreFlat">恢复平地</button></div>
+        <p id="statics-slope-state" class="muted" role="status"></p><div id="statics-placement-detail" class="statics-detail"></div><div id="statics-friction-summary" class="statics-detail"></div>
+      </details>
+      <details id="statics-wheel-section" open><summary data-i18n="wheelTorques">轮轴保持力矩</summary><div id="statics-wheel-loads"></div><p class="muted" data-i18n="wheelHoldingNote">假设轮轴由电机或制动器保持静止；数值为轴端力矩。</p></details>
+      <details open><summary data-i18n="supportContacts">支撑接触</summary><div class="statics-contact-tools"><select id="statics-contact-mode" aria-label="接触识别模式"><option value="auto">自动识别</option><option value="manual">手动指定 link</option></select><span id="statics-contact-count" class="muted"></span></div><div id="statics-contact-editor" hidden><select id="statics-contact-add" aria-label="添加支撑连杆"></select><button id="statics-add-contact" aria-label="添加支撑连杆">＋</button></div><div id="statics-contacts"></div></details>
+      <details id="statics-joint-details"><summary data-i18n="jointStatics">选中关节参数</summary><div id="statics-joint-detail" class="statics-detail"></div></details>
+      <details open><summary data-i18n="jointLoads">关节载荷</summary><div id="statics-joints"></div></details>
 
-      
-      <ul id="joint-controls"></ul>
-    </div>
-  </div>
-
-  <div id="drop-zone">
-    <p style="margin:0; padding:0; border:none; background:none; box-shadow:none;">🚀 拖入 URDF 文件或文件夹</p>
-  </div>
-    
-  <urdf-viewer up="+Z" display-shadow="" tabindex="0"></urdf-viewer>
-  
-  <script src="src.a2b27638.js"></script>
-  
-  
+      <details><summary data-i18n="staticsAssumptions">计算假设与数据</summary><p id="statics-method" class="muted"></p><p id="statics-mass-note" class="muted"></p><p class="statics-equation">ΣF = 0 · ΣM = 0<br>τ = −a · Σ(r × F)</p><p class="muted"><a href="https://modernrobotics.northwestern.edu/nu-gm-book-resource/5-2-statics-of-open-chains/" target="_blank" rel="noreferrer">Modern Robotics · Statics</a></p></details>
+    </section>
+  </aside>
+  <div id="drop-overlay" hidden><div>↥<strong data-i18n="release">松开以加载机器人模型</strong><span>URDF / XML + STL / DAE / OBJ / GLTF</span></div></div>
+  <div id="status" role="status" aria-live="polite"><span class="status-dot"></span><span id="status-text" data-i18n="ready">就绪 · 加载模型以开始</span></div>
+  <svg id="statics-overlay" aria-hidden="true" hidden></svg><div id="statics-labels" hidden></div>
+  <svg id="link-measure-overlay" aria-hidden="true" hidden></svg>
+  <svg id="measure-snap-overlay" aria-hidden="true" hidden></svg><div id="measure-snap-hint" role="status" hidden></div>
+  <section id="joint-angle-tooltip" aria-label="关节位置编辑" hidden>
+    <div id="joint-angle-name"></div><button id="joint-angle-readout" type="button" title="点击修改关节位置"></button>
+    <form id="joint-angle-form" novalidate hidden><input id="joint-angle-input" type="number" step="any" aria-label="关节位置"><span id="joint-angle-unit"></span><button type="submit" title="应用 (Enter)" aria-label="应用关节位置">✓</button><button id="joint-angle-cancel" type="button" title="取消 (Esc)" aria-label="取消编辑关节位置">×</button></form>
+    <div id="joint-angle-feedback" role="status"></div>
+  </section>
+  <section id="measure-result" aria-label="两点三维测量" hidden>
+    <div class="surface-measure-heading"><strong data-i18n="measure">两点测量</strong><span id="surface-measure-distance"></span><select id="surface-measure-unit" aria-label="两点测量单位"><option value="mm">mm</option><option value="m">m</option></select><button aria-label="清除测量">×</button></div>
+    <div id="surface-measure-a"></div><div id="surface-measure-b"></div>
+    <div class="surface-measure-components"><output id="surface-measure-dx"></output><output id="surface-measure-dy"></output><output id="surface-measure-dz"></output></div>
+    <p data-i18n="surfaceMeasureBasis">场景坐标 · B − A · Shift 选点 · Alt 暂停吸附</p>
+  </section>
+  <footer class="view-help"><span><b data-i18n="leftDrag">左键拖动</b> <span data-i18n="rotate">旋转视角</span></span><span><b data-i18n="rightDrag">右键拖动</b> <span data-i18n="pan">平移视角</span></span><span><b data-i18n="wheel">滚轮</b> <span data-i18n="zoom">缩放视图</span></span><span><b>F</b> <span data-i18n="fit">适应视图</span></span><span><b>Shift + 点击</b> <span data-i18n="measure">两点测量</span></span><span><b>Ctrl + 点击</b> <span data-i18n="linkMeasureAction">连杆测量</span></span></footer>
+  <input id="file-input" type="file" accept=".urdf,.xml,.stl,.dae,.obj,.gltf,.glb,.bin,.png,.jpg,.jpeg,.webp" multiple hidden><input id="folder-input" type="file" webkitdirectory multiple hidden>
+  <dialog id="help-dialog"><div class="dialog-header"><h2 data-i18n="helpTitle">URDF Viewer 使用帮助</h2><button id="close-help" aria-label="关闭帮助">×</button></div><div id="help-content"></div><button id="restore-layout" data-i18n="restoreLayout">恢复面板布局</button></dialog>
+  <script src="src.a2b27638.js"></script><script src="measurement-features.js"></script><script src="statics-core.js"></script><script src="statics-contacts.js"></script><script src="statics-annotations.js"></script><script src="statics-terrain.js"></script><script src="statics-workbench.js"></script><script src="source-files.js"></script><script src="workbench.js"></script>
 </body>
 </html>
