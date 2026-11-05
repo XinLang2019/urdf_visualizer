@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#2E6B8A">
-  <title>URDF Viewer · 机器人模型工作台</title><link rel="stylesheet" href="workbench.css">
+  <title>URDF-Viewer</title><link rel="icon" type="image/svg+xml" href="assets/robot.svg"><link rel="stylesheet" href="workbench.css">
 </head>
 <body>
   <main id="viewport" aria-label="机器人三维视图"><urdf-viewer up="+Z" display-shadow tabindex="0" aria-label="三维模型：左键旋转，右键平移，滚轮缩放"></urdf-viewer></main>
@@ -97,7 +97,7 @@
   </section>
   <footer class="view-help"><span><b data-i18n="leftDrag">左键拖动</b> <span data-i18n="rotate">旋转视角</span></span><span><b data-i18n="rightDrag">右键拖动</b> <span data-i18n="pan">平移视角</span></span><span><b data-i18n="wheel">滚轮</b> <span data-i18n="zoom">缩放视图</span></span><span><b>F</b> <span data-i18n="fit">适应视图</span></span><span><b>Shift + 点击</b> <span data-i18n="measure">两点测量</span></span><span><b>Ctrl + 点击</b> <span data-i18n="linkMeasureAction">连杆测量</span></span></footer>
   <input id="file-input" type="file" accept=".urdf,.xml,.stl,.dae,.obj,.gltf,.glb,.bin,.png,.jpg,.jpeg,.webp" multiple hidden><input id="folder-input" type="file" webkitdirectory multiple hidden>
-  <dialog id="help-dialog"><div class="dialog-header"><h2 data-i18n="helpTitle">URDF Viewer 使用帮助</h2><button id="close-help" aria-label="关闭帮助">×</button></div><div id="help-content"></div><button id="restore-layout" data-i18n="restoreLayout">恢复面板布局</button></dialog>
-  <script src="src.a2b27638.js"></script><script src="measurement-features.js"></script><script src="statics-core.js"></script><script src="statics-contacts.js"></script><script src="statics-annotations.js"></script><script src="statics-terrain.js"></script><script src="statics-workbench.js"></script><script src="source-files.js"></script><script src="workbench.js"></script>
+  <dialog id="help-dialog" aria-labelledby="help-title"><div class="dialog-header"><div class="help-heading"><img src="assets/robot.svg" width="42" height="42" alt=""><div><span class="help-brand">URDF-Viewer</span><h2 id="help-title" data-i18n="helpTitle">使用指南</h2></div></div><button id="close-help" type="button" aria-label="关闭帮助" autofocus>×</button></div><div id="help-content"></div><footer class="help-footer"><span id="help-footer-hint"></span><button id="restore-layout" data-i18n="restoreLayout">恢复面板布局</button></footer></dialog>
+  <script src="src.a2b27638.js"></script><script src="measurement-features.js"></script><script src="statics-core.js"></script><script src="statics-contacts.js"></script><script src="statics-annotations.js"></script><script src="statics-terrain.js"></script><script src="statics-workbench.js"></script><script src="source-files.js"></script><script src="help-guide.js"></script><script src="workbench.js"></script>
 </body>
 </html>

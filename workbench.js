@@ -97,7 +97,7 @@
     ctrlLinkHint:['按住 Ctrl 选择 link · 松开恢复关节拖动 · Esc 清除','Hold Ctrl to choose links · Release to drag joints · Esc clears'],
     pickLinkOnly:['请点击 link 连杆节点，关节和 Ground 不作为测量端点','Choose a link node; joints and Ground are not endpoints'],
     pickOtherLink:['请选择另一个不同的 link','Choose a different link'],
-    helpTitle:['URDF Viewer 使用帮助','URDF Viewer help'],
+    helpTitle:['使用指南','User guide'],
     restoreLayout:['恢复面板布局','Restore panel layout'],
     applied:['已应用','Applied'],
     modified:['未应用','Modified'],
@@ -1717,28 +1717,8 @@
     refreshWorkspace();viewer.redraw();
   });
   statics=createStaticsWorkbench({THREE,viewer,grid,refreshScene:()=>{queueLinkMeasurementUpdate();queueJointAngleUpdate();fitView();},getModel:()=>({xml:state.xml,version:state.version}),getLanguage:()=>lang,openRight:()=>setPanel('editor',true),refreshAxes:refreshJointAngleAxis,project:projectMeasurementPoint});
-  $('help').onclick=()=>$('help-dialog').showModal();$('close-help').onclick=()=>$('help-dialog').close();
-  function translate(){document.documentElement.lang=lang==='zh'?'zh-CN':'en';$$('[data-i18n]').forEach(el=>el.textContent=t(el.dataset.i18n));$('language').textContent=lang==='zh'?'EN':'中文';$('joint-search').placeholder=lang==='zh'?'搜索关节…':'Search joints…';$('help-content').replaceChildren();const paragraphs=lang==='zh'?[
-    '加载：选择 URDF 文件和相关网格，或加载完整机器人文件夹。目录中有多个 URDF 时可选择其中一个。资源只在本机浏览器中读取。',
-    '视图：左键旋转、右键平移、滚轮缩放。F 适应模型，点击右上角 X / Y / Z 切换视角。Shift 悬停显示几何推荐点，靠近后吸附；Shift 点击两个点，显示直线距离与 XYZ 分量，支持 mm / m。Alt 暂停吸附，Esc 清除。',
-    '推荐点：圆形端面的圆心、圆柱中心与四等分点、球心、矩形顶点和面中心、连杆原点。四等分点以世界 +X 在圆平面上的投影为 0°，平行时改用 +Y，绕法向依次为 90°、180°、270°。导入网格中识别出的圆形、矩形标为“网格拟合”；包围盒中心单独标明。选中的点随连杆运动。',
-    '定位：双击三维 link，自动滚动到直接父关节卡片和编辑器中的 link 代码块，各闪烁两次；根 link 仅定位代码。拖动连杆时显示实际操纵关节的轴和当前位置，松开后保留 3 秒，点击其他位置立即隐藏。点击数值输入目标位置，Enter / ✓ 应用，Esc / × 取消；编辑时暂停隐藏。直接输入遵守 URDF 限位，连续旋转关节不额外限位。',
-    '关节：拖动滑块或输入数值；支持弧度 / 角度切换，移动关节使用米。限位默认开启，模拟关节自动跟随；动画可再次点击暂停。',
-    '结构：沿父子关系显示连杆与关节。拖动平移、滚轮缩放，点击选中、右键切换子树可见性；固定节点按钮展开附件分支，⌖ 或双击空白处适应全图。',
-    '连杆测量：点击结构面板的测量，再依次选择两个 link，或在结构图 / 三维模型中 Ctrl + 点击两个 link。通过按钮开启测量模式后，也可直接点击三维连杆；Ctrl 快捷选择仅在按住时生效，松开恢复关节拖动并保留测量结果。测量使用坐标原点，按场景坐标显示 B − A 的 XYZ 分量和直线距离，默认毫米；关节运动后自动更新。× 重新选择，Esc 退出。',
-    '编辑：Ctrl + Enter 校验并应用 URDF；Ctrl + S 将当前文本保存回源文件；首次保存内置示例或旧方式加载的文件时，选择一次对应源文件以授权。保存不会自动重新加载模型。网格路径沿用加载文件夹或示例的目录。错误会显示在编辑器下方并保留原模型。',
-    '布局：左侧工作栏以标签切换文件、关节和结构，‹ 收起，顶部工作栏按钮可恢复。拖动两侧内边缘调整宽度，双击边缘恢复默认；右侧编辑器可折叠或关闭。窄屏默认收起编辑器，手机一次显示一个工作区，工具栏可横向滚动。'
-  ]:[
-    'Load a URDF together with its meshes, or select the complete robot folder. If several models are found, choose one. Local files remain in your browser.',
-    'Left drag rotates; right drag pans; scroll zooms. F fits the model. Click X / Y / Z for axis views. Hold Shift to see geometric snap points, then click two points for distance and signed XYZ components in mm or m. Alt bypasses snapping; Esc clears.',
-    'Snap points include circular face centers, cylinder centers and quadrant points, sphere centers, rectangle corners and face centers, and link origins. Zero degrees follows world +X projected onto the circle, falling back to +Y when parallel; the remaining points follow at 90°, 180° and 270° about the normal. Imported circular and rectangular features are marked Mesh fitted; bounding box centers are named separately. Picked points follow link motion.',
-    'Double-click a 3D link to locate and flash its direct parent joint card and source link block twice. Root links locate source only. Dragging reveals the joint axis and live position, retained for 3 seconds after release and dismissed immediately when clicking elsewhere. Click the value to edit; Enter / ✓ applies and Esc / × cancels. Hiding pauses while editing. Direct edits respect URDF limits; continuous joints remain unrestricted.',
-    'Joint sliders and numbers support radians or degrees; prismatic joints use meters. Limits are enabled by default. Mimic joints follow their source. Click Animate again to pause.',
-    'Structure follows the kinematic hierarchy. Drag to pan, scroll to zoom, click to select and right click to toggle subtree visibility. Fixed nodes reveals attachments; ⌖ or double click the background fits the graph.',
-    'Link measurement: click Measure and choose two link nodes, or Ctrl + click two links in the structure or 3D view. The Measure button enables persistent selection. Ctrl selection only applies while held; releasing it restores joint dragging and retains results. Their coordinate origins define the endpoints. Signed XYZ components use scene coordinates (B − A), defaulting to millimeters. Values follow joint motion. × clears the pair; Esc exits.',
-    'Ctrl + Enter validates and applies XML. Ctrl + S saves editor text back to its source. For examples or legacy imports, select the original file once to grant access. Saving does not reload the model. Mesh paths use the current folder or example directory. Invalid edits retain the previous model.',
-    'Layout: switch Files / Joints / Structure in the left workspace. ‹ collapses the workspace; the toolbar restores it. Drag either inner edge to resize and double-click the edge to reset. The full-height editor on the right can be collapsed or closed. Compact screens start with the editor hidden; phones show one workspace at a time.'
-  ];for(const text of paragraphs){const p=document.createElement('p');p.textContent=text;$('help-content').append(p);}updateEditor();filterJoints();refreshWorkspace();statics?.languageChanged();updateLinkMeasureUI();updateLinkMeasurement();if(surfaceSnap.pointer)renderSurfaceSnap();if(viewer.robot){$('model-meta').textContent=`${Object.keys(viewer.robot.links).length} ${t('linkTotal')} · ${Object.keys(viewer.robot.joints).length} ${t('jointTotal')}`;}}
+  $('help').onclick=()=>{$('help-dialog').showModal();$('help-content').scrollTop=0;};$('close-help').onclick=()=>$('help-dialog').close();
+  function translate(){document.documentElement.lang=lang==='zh'?'zh-CN':'en';$$('[data-i18n]').forEach(el=>el.textContent=t(el.dataset.i18n));$('language').textContent=lang==='zh'?'EN':'中文';$('joint-search').placeholder=lang==='zh'?'搜索关节…':'Search joints…';renderURDFHelp($('help-content'),lang);updateEditor();filterJoints();refreshWorkspace();statics?.languageChanged();updateLinkMeasureUI();updateLinkMeasurement();if(surfaceSnap.pointer)renderSurfaceSnap();if(viewer.robot){$('model-meta').textContent=`${Object.keys(viewer.robot.links).length} ${t('linkTotal')} · ${Object.keys(viewer.robot.joints).length} ${t('jointTotal')}`;}}
   $('language').onclick=()=>{lang=lang==='zh'?'en':'zh';translate();};
   $('theme').onclick=()=>{const light=document.body.classList.toggle('light');$('theme').textContent=light?'☀':'☾';document.querySelector('meta[name="theme-color"]').content=light?'#E8F0F8':'#2E6B8A';grid.material.color.set(light?0x2e6b8a:0x6ba3c8);grid.material.opacity=light?.26:.32;viewer.redraw();};
   translate();
