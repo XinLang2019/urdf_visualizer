@@ -21,10 +21,11 @@ Chrome / Edge is recommended. Saving back to a source file requires localhost or
 ## Features
 
 - **Models and structure**: file / folder import, drag and drop, and a structure graph. Bundled examples include Go2, G1, ANYmal B / C, and Cassie.
-- **Joint control**: pose robots by dragging links or sliders; joint limits, degrees / radians, and animation. Double-click a link to locate its joint and code.
+- **Joint control**: pose robots by dragging links or sliders; joint limits and degrees / radians. Double-click a link to locate its joint and code.
 - **Visual helpers**: visual and collision geometry, centers of mass, equivalent inertia boxes, link frames, and joint axes. Light / dark themes and Chinese / English UI.
 - **3D measurement**: point-to-point or link-origin distance with XYZ components, with up to 5 geometric snap candidates.
 - **Edit and save**: XML highlighting, validation, model reload, and saving edits directly to the source file.
+- **Keyframe motion**: author joint and base poses, choose four interpolation modes, retain full flip turns, and export sampled JSON / CSV references. [Workflow and data format](docs/motion.md#english).
 - **Statics**: live joint torques, contact reactions, and moment arms. Configure slope and friction, fit wheels / feet to the ground, and solve body attitude.
 
 | 3D distance and XYZ components | Slope contacts and joint torques |

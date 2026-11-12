@@ -11,15 +11,16 @@
       <button data-display="visual" class="active" aria-pressed="true" data-i18n="visual">视觉</button><button data-display="collision" aria-pressed="false" data-i18n="collision">碰撞</button><button data-display="inertia" aria-pressed="false" data-i18n="inertia">惯量</button><button data-display="com" aria-pressed="false" data-i18n="com">质心</button><button data-display="axes" aria-pressed="false" data-i18n="axes">坐标轴</button><button data-display="jointAxes" aria-pressed="false" data-i18n="jointAxes">关节轴</button><button data-display="shadow" class="active" aria-pressed="true" data-i18n="shadow">阴影</button><button data-display="lighting" class="active" aria-pressed="true" data-i18n="lighting">光照</button><button data-display="grid" class="active" aria-pressed="true" data-i18n="grid">网格</button>
     </div>
     <div class="tool-group"><select id="up-select" aria-label="向上轴"><option>+Z</option><option>-Z</option><option>+Y</option><option>-Y</option><option>+X</option><option>-X</option></select><button id="fit-view" title="适应视图 (F)" aria-label="适应视图">⌖</button></div>
-    <div class="tool-group"><button id="workspace-toggle" class="active" aria-pressed="true" aria-controls="workspace-sidebar" data-i18n="workspace">工作栏</button><button id="statics-toggle" aria-pressed="false" data-i18n="statics">受力分析</button><button id="animate" aria-pressed="false" data-i18n="animate">动画</button><button data-panel="editor" class="active" aria-pressed="true" data-i18n="editor">编辑</button></div>
+    <div class="tool-group"><button id="workspace-toggle" class="active" aria-pressed="true" aria-controls="workspace-sidebar" data-i18n="workspace">工作栏</button><button id="statics-toggle" aria-pressed="false" data-i18n="statics">受力分析</button><button id="animate" aria-pressed="false" data-i18n="animate">轨迹</button><button data-panel="editor" class="active" aria-pressed="true" data-i18n="editor">编辑</button></div>
     <div class="tool-group"><button id="help" data-i18n="help">帮助</button><button id="language" title="Switch language">EN</button><button id="theme" title="切换明暗主题" aria-label="切换明暗主题">☾</button></div>
   </nav>
   <section id="workspace-sidebar" class="workspace-sidebar" aria-label="模型工作栏">
     <nav class="workspace-tabs" aria-label="模型工具">
-      <div role="tablist" aria-label="文件、关节和结构">
+      <div role="tablist" aria-label="文件、关节、结构和轨迹">
         <button id="tab-files" data-panel="files" role="tab" aria-selected="true" aria-controls="files-panel" class="active" data-i18n="files">文件</button>
         <button id="tab-joints" data-panel="joints" role="tab" aria-selected="false" aria-controls="joints-panel" tabindex="-1" data-i18n="joints">关节</button>
         <button id="tab-structure" data-panel="structure" role="tab" aria-selected="false" aria-controls="structure-panel" tabindex="-1" data-i18n="structure">结构</button>
+        <button id="tab-motion" data-panel="motion" role="tab" aria-selected="false" aria-controls="motion-panel" tabindex="-1" data-i18n="motion">轨迹</button>
       </div>
       <button id="sidebar-toggle" aria-label="收起工作栏" title="收起 / 展开工作栏" aria-expanded="true" aria-controls="workspace-content">‹</button>
     </nav>
@@ -45,6 +46,7 @@
         <p class="link-measure-basis" data-i18n="linkMeasureBasis">连杆原点 · 场景坐标 · B − A</p>
       </section></div>
   </aside>
+  <aside id="motion-panel" class="panel panel-motion" role="tabpanel" aria-labelledby="tab-motion" hidden><header class="panel-header"><h2 data-i18n="motionTitle">关键帧编排</h2></header><div class="panel-body"><p id="motion-status" role="status" class="muted"></p><div id="motion-content"></div></div></aside>
     </div>
     <div id="sidebar-resize" class="dock-resize-handle" role="separator" tabindex="0" aria-label="调整工作栏宽度" aria-orientation="vertical" aria-valuemin="260" aria-valuemax="440"></div>
   </section>
@@ -98,6 +100,8 @@
   <footer class="view-help"><span><b data-i18n="leftDrag">左键拖动</b> <span data-i18n="rotate">旋转视角</span></span><span><b data-i18n="rightDrag">右键拖动</b> <span data-i18n="pan">平移视角</span></span><span><b data-i18n="wheel">滚轮</b> <span data-i18n="zoom">缩放视图</span></span><span><b>F</b> <span data-i18n="fit">适应视图</span></span><span><b>Shift + 点击</b> <span data-i18n="measure">两点测量</span></span><span><b>Ctrl + 点击</b> <span data-i18n="linkMeasureAction">连杆测量</span></span></footer>
   <input id="file-input" type="file" accept=".urdf,.xml,.stl,.dae,.obj,.gltf,.glb,.bin,.png,.jpg,.jpeg,.webp" multiple hidden><input id="folder-input" type="file" webkitdirectory multiple hidden>
   <dialog id="help-dialog" aria-labelledby="help-title"><div class="dialog-header"><div class="help-heading"><img src="assets/robot.svg" width="42" height="42" alt=""><div><span class="help-brand">URDF-Viewer</span><h2 id="help-title" data-i18n="helpTitle">使用指南</h2></div></div><button id="close-help" type="button" aria-label="关闭帮助" autofocus>×</button></div><div id="help-content"></div><footer class="help-footer"><span id="help-footer-hint"></span><button id="restore-layout" data-i18n="restoreLayout">恢复面板布局</button></footer></dialog>
-  <script src="src.a2b27638.js"></script><script src="measurement-features.js"></script><script src="statics-core.js"></script><script src="statics-contacts.js"></script><script src="statics-annotations.js"></script><script src="statics-terrain.js"></script><script src="statics-workbench.js"></script><script src="source-files.js"></script><script src="help-guide.js"></script><script src="workbench.js"></script>
+  <section id="motion-timeline" aria-label="关键帧轨迹时间轴" hidden></section>
+  <input id="motion-import" type="file" accept=".json,application/json" hidden>
+  <script src="src.a2b27638.js"></script><script src="measurement-features.js"></script><script src="statics-core.js"></script><script src="statics-contacts.js"></script><script src="statics-annotations.js"></script><script src="statics-terrain.js"></script><script src="statics-workbench.js"></script><script src="source-files.js"></script><script src="help-guide.js"></script><script src="trajectory-core.js"></script><script src="trajectory-workbench.js"></script><script src="workbench.js"></script>
 </body>
 </html>

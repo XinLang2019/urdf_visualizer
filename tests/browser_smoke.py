@@ -23,6 +23,7 @@ from support_fitting import check_support_fitting, check_go2_support_fit
 from statics_labels import check_statics_labels
 from editor_save import check_editor_save
 from wheel_contacts import check_wheel_contacts
+from trajectory_editor import check_trajectory_editor
 
 ROOT = Path(__file__).resolve().parents[1]
 BROWSER = os.environ.get('CHROME_BIN') or next((shutil.which(name) for name in ['google-chrome', 'chromium', 'chromium-browser'] if shutil.which(name)), None)
@@ -108,10 +109,7 @@ def run(client, url, output):
     check(client, 'urdfWorkbench.viewer.robot.joints.FL_hip_joint.angle>2', 'limits can be disabled')
     click(client, 'limits')
     click(client, 'reset-joints')
-    click(client, 'animate')
-    time.sleep(.5)
-    check(client, 'Math.abs(urdfWorkbench.viewer.robot.joints.FL_hip_joint.angle)>.001', 'animation changes movable joints')
-    click(client, 'animate')
+    check_trajectory_editor(client, output, check)
     for key in ['visual', 'collision', 'inertia', 'com', 'axes', 'jointAxes', 'shadow', 'lighting', 'grid']:
         client.js('document.querySelector(' + json.dumps(f'[data-display="{key}"]') + ').click()')
     check(client, '!urdfWorkbench.display.visual && urdfWorkbench.display.collision && !urdfWorkbench.display.grid', 'display controls change render state')

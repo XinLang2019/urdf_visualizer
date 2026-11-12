@@ -271,6 +271,7 @@ window.createStaticsWorkbench=function({THREE,viewer,grid,refreshScene,getModel,
   window.addEventListener('keydown',event=>{if(event.key==='Escape'&&pinned&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){pinned=null;render();requestProjection();}});
   viewer.addEventListener('angle-change',requestSolve);viewer.controls.addEventListener('change',requestProjection);window.addEventListener('resize',requestProjection);
   return {get enabled(){return enabled;},get view(){return rightView;},get snapshot(){return result?JSON.parse(JSON.stringify({...result,enabled,ground,terrain:terrain.snapshot,selected,inspection:pinned,visibleLabels:[...labels].filter(([,label])=>!label.hidden).map(([name])=>name),leverBreakdown:pinned?engine.leverBreakdown(result,pinned):null,missingMasses:model?.missing||[]})):{enabled,valid:false};},requestSolve,requestProjection,setRightView,selectJoint,
+    prepareMotion(){if(enabled)toggle(false);if(terrain.active){terrain.reset(false);ground=null;renderTerrain();}},
     modelChanged(){terrain.reset(false);buildModel();result=null;updateEmphasis();refreshAxes();if(enabled)requestSolve();else render();},
     syncTerrainEnvironment(){terrain.sync();},
     orientationChanged(){terrain.reset();ground=null;refreshScene();requestSolve();renderTerrain();},
