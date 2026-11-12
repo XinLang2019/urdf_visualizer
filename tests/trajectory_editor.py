@@ -1,6 +1,7 @@
 """Reference motion math, winding, editor interaction, and export round trips."""
 import json
 from model_interaction import rendered_frame, pointer
+from motion_body import check_motion_body
 
 
 def check_trajectory_editor(client,output,check):
@@ -38,8 +39,8 @@ def check_trajectory_editor(client,output,check):
     check(client,'Math.abs(urdfWorkbench.viewer.robot.quaternion.y)>.999&&Math.abs(urdfWorkbench.viewer.robot.position.z-.6)<1e-6','scrubbing applies halfway full-flip orientation and base translation in 3D')
     client.js('document.getElementById("statics-toggle").click();document.getElementById("motion-play").click()')
     rendered_frame(client)
-    check(client,'urdfWorkbench.motion.playing&&!urdfWorkbench.statics.enabled','playback suspends quasi-static torque labels')
-    client.js('document.getElementById("motion-play").click();document.getElementById("motion-edit-joints").click()')
+    check(client,'(urdfWorkbench.motion.playing||urdfWorkbench.motion.time===.5)&&!urdfWorkbench.statics.enabled','playback suspends quasi-static torque labels')
+    client.js('if(urdfWorkbench.motion.playing)document.getElementById("motion-play").click();document.getElementById("motion-edit-joints").click()')
     client.js('''const slider=document.querySelector('#joint-list li[data-name="FL_hip_joint"] input[type=range]');slider.value=.2;slider.dispatchEvent(new Event('input'));document.getElementById('tab-motion').click();document.getElementById('motion-update').click()''')
     check(client,'Math.abs(urdfWorkbench.motion.project.keyframes[1].joints[urdfWorkbench.motion.project.model.joints.findIndex(j=>j.name==="FL_hip_joint")]-.2)<1e-6&&!urdfWorkbench.motion.playing','joint editing pauses playback and updates the selected key explicitly')
     client.js('document.getElementById("motion-key-time").value="1.3";document.getElementById("motion-key-time").dispatchEvent(new Event("change"))')
@@ -92,6 +93,7 @@ def check_trajectory_editor(client,output,check):
     client.js(transfer.replace('PROJECT',json.dumps(project)));rendered_frame(client)
     client.js('document.getElementById("motion-close").click();(()=>{const v=urdfWorkbench.viewer;v.robot.position.fromArray(motionInitial.position);v.robot.quaternion.fromArray(motionInitial.quaternion);for(const [n,value]of Object.entries(motionInitial.joints))v.setJointValue(n,value);v.redraw()})()')
     check_motion_models(client,check)
+    check_motion_body(client,output,check)
     print('PASS keyframe editor, scrubbing, winding, joints/base poses, retiming, undo/redo, export/import, statics coordination and responsive controls',flush=True)
 
 

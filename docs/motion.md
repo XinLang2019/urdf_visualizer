@@ -9,10 +9,12 @@
 点击顶部“轨迹”或左侧“轨迹”标签。编辑器记录**独立关节 + 机身六自由度姿态**，不修改 URDF 文件。
 
 1. 调整站姿，点击“记录姿态”，首帧时间为 `0 s`。
-2. 在关节标签中拖动连杆、滑块或输入关节值；在轨迹标签中设置机身 XYZ、Roll / Pitch / Yaw。
+2. 在关节标签中拖动连杆、滑块或输入关节值；在轨迹标签中设置机身 XYZ、Roll / Pitch / Yaw，也可单击三维机身，在旁边的浮动编辑框中直接修改，并记录或更新关键帧。
 3. 设置“下次记录时间”，再次记录。选择已有帧后，“更新帧”将当前三维姿态写回该帧；单纯拖动模型不会自动覆盖关键帧。
 4. 点击时间轴菱形选择关键帧；拖动菱形或修改帧时间调整节奏。首帧固定在 0 秒。时间滑块用于预览，支持逐采样帧、变速、循环、撤销和重做。时间轴的 ⌖ 按钮适应整段轨迹；轨迹栏内 Ctrl + S 保存动作工程。
 5. 用“保存工程”导出可再次编辑的 `.motion.json`；用“导出参考”按指定 Hz 输出 JSON，或 CSV + 元数据 JSON。
+
+进入轨迹模式后，地面的位置和朝向保持固定，播放、调姿和适应视图不会使地面跟随机器人。进入模式时不会自动重新取景；可使用时间轴的 ⌖ 按钮查看整段动作。
 
 ### 插值与空翻
 
@@ -48,10 +50,12 @@
 Open **Motion** from the toolbar or left workspace. Each keyframe stores independent joint positions and the base's six-degree-of-freedom pose without changing the URDF.
 
 1. Set a pose and record the first key at `0 s`.
-2. Adjust links or joint sliders in Joints; edit base XYZ and Roll / Pitch / Yaw in Motion.
+2. Adjust links or joint sliders in Joints; edit base XYZ and Roll / Pitch / Yaw in Motion, or click the 3D chassis to edit them beside the model and record or update a key.
 3. Set the next recording time and record again. Select a key and use **Update key** to replace its pose; posing the robot alone does not overwrite a key.
 4. Select or drag timeline diamonds, or edit key times. The first key remains at zero. Scrub, step by one sample, adjust playback speed, loop, undo, or redo. Use ⌖ to fit the whole trajectory; Ctrl + S inside Motion saves the project.
 5. Save `.motion.json` for further editing. Export sampled references as JSON or CSV with a metadata JSON sidecar at your chosen Hz.
+
+Motion mode holds the ground position and orientation fixed during posing, playback, and fitting the view. Entering the mode does not automatically refit the camera; use the timeline’s ⌖ button to fit the entire motion.
 
 ### Interpolation and flips
 

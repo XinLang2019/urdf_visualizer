@@ -164,9 +164,11 @@
   const updateEnvironment=viewer._updateEnvironment.bind(viewer);
   viewer._updateEnvironment=()=>{
     if(!viewer.robot || objectBounds(viewer.robot).isEmpty())return;
+    const target=motion?.groundLocked?viewer.controls.target.clone():null;
     updateEnvironment();
     grid.position.y=viewer.plane.position.y+.002;
     statics?.syncTerrainEnvironment();
+    if(target){viewer.controls.target.copy(target);motion.restoreGround();}
   };
   viewer.noAutoRecenter=true;
   viewer.highlightColor='#68b7ff';
@@ -291,7 +293,7 @@
     // Swap only after XML and meshes finish. Invalid edits retain the current model.
     resetModelPointer();clearJointAngleUI();cancelLinkNavigation();clearMeasurement(); clearSelection();
     state.helpers.forEach(helper=>dispose(helper.object)); state.helpers=[];
-    dispose(viewer.robot);
+    motion?.beforeModelChanged();dispose(viewer.robot);
     const oldContext=state.context;
     viewer.robot=robot;viewer.world.visible=true;viewer.world.add(robot);
     robot.traverse(child=>{if(child.isMesh){child.castShadow=true;child.receiveShadow=true;const mats=Array.isArray(child.material)?child.material:[child.material];mats.forEach(mat=>{if(mat?.map)mat.map.colorSpace=THREE.SRGBColorSpace;});}});
@@ -903,6 +905,7 @@
       if(!event.isPrimary){resetModelPointer();return;}
       lastModelPointer=event.pointerType==='touch'?null:{clientX:event.clientX,clientY:event.clientY,shiftKey:event.shiftKey,ctrlKey:event.ctrlKey,metaKey:event.metaKey,altKey:event.altKey};
       controls.moveRay(rayFromPointer(event).ray);
+      if(motion?.isBodyLink(hoveredLink))motion.pause();else motion?.hideBodyEditor();
       modelPointerDown={id:event.pointerId,x:event.clientX,y:event.clientY,link:hoveredLink,moved:false,joint:false};
       if(event.pointerType!=='touch' && controls.hovered && !viewer.disableDragging) {
         event.preventDefault();event.stopImmediatePropagation();
@@ -929,7 +932,10 @@
       modelPointerDown=null;
       if(canvas.hasPointerCapture(event.pointerId) && pointer.joint)canvas.releasePointerCapture(event.pointerId);
       const hit=visibleModelHit(rayFromPointer(event));
-      if(!pointer.moved && pointer.link && hit?.link===pointer.link)selectLink(hit.link);
+      if(!pointer.moved){
+        if(pointer.link && hit?.link===pointer.link){selectLink(hit.link);if(!motion?.pickBody(hit.link,hit.point))motion?.hideBodyEditor();}
+        else motion?.hideBodyEditor();
+      }
       setHoveredLink(event.pointerType==='touch'?null:hit?.link || null);
       canvas.style.cursor=hoveredLink?'pointer':'';
     },true);
@@ -937,7 +943,7 @@
     canvas.addEventListener('dblclick',event=>{
       if(event.button!==0 || event.ctrlKey || event.metaKey || event.shiftKey || linkMeasurement.pinned)return;
       const hit=visibleModelHit(rayFromPointer(event));if(!hit?.link)return;
-      event.preventDefault();event.stopPropagation();navigateToLink(hit.link);
+      event.preventDefault();event.stopPropagation();motion?.hideBodyEditor();navigateToLink(hit.link);
     });
     canvas.addEventListener('pointercancel',resetModelPointer);
     canvas.addEventListener('lostpointercapture',()=>{if(modelPointerDown?.joint)resetModelPointer();});
@@ -1190,7 +1196,7 @@
     const available=updateCameraFrame();
     const distance=Math.max(size, .25)/(2*Math.tan(THREE.MathUtils.degToRad(viewer.camera.fov/2)))*Math.max(1.2,1/(viewer.camera.aspect*available.width),1/available.height);
     viewer.controls.target.copy(center);viewer.camera.position.copy(center).add(new THREE.Vector3(1,.75,1).normalize().multiplyScalar(distance));viewer.controls.maxDistance=Math.max(50,distance*8);viewer.camera.far=Math.max(1000,distance*12);viewer.camera.updateProjectionMatrix();viewer.controls.update();
-    if(!bounds?.isBox3 && viewer.robot && !box.isEmpty()){grid.position.y=box.min.y-.003;viewer.plane.position.y=box.min.y-.002;viewer._updateEnvironment();}viewer.redraw();updateGizmo();
+    if(!bounds?.isBox3 && !motion?.groundLocked && viewer.robot && !box.isEmpty()){grid.position.y=box.min.y-.003;viewer.plane.position.y=box.min.y-.002;viewer._updateEnvironment();}viewer.redraw();updateGizmo();
   }
   $('fit-view').onclick=fitView;
   $('up-select').onchange=()=>{viewer.up=$('up-select').value;fitView();queueLinkMeasurementUpdate();statics?.orientationChanged();motion?.orientationChanged();};
@@ -1721,10 +1727,10 @@
     refreshWorkspace();viewer.redraw();
   });
   statics=createStaticsWorkbench({THREE,viewer,grid,refreshScene:()=>{queueLinkMeasurementUpdate();queueJointAngleUpdate();fitView();},getModel:()=>({xml:state.xml,version:state.version}),getLanguage:()=>lang,openRight:()=>setPanel('editor',true),refreshAxes:refreshJointAngleAxis,project:projectMeasurementPoint});
-  motion=createTrajectoryWorkbench({THREE,viewer,fitBounds:fitView,getJointInfo:()=>state.orderedJoints.map(n=>({name:n.name,velocity:Number(direct(n.element,'limit')?.getAttribute('velocity'))})),getLanguage:()=>lang,showPanel:name=>setPanel(name,true),refreshLayout:refreshWorkspace,
-    beforePose:()=>{clearSurfaceMeasurement();statics.prepareMotion();},
+  motion=createTrajectoryWorkbench({THREE,viewer,grid,projectPoint:projectMeasurementPoint,fitBounds:fitView,getJointInfo:()=>state.orderedJoints.map(n=>({name:n.name,velocity:Number(direct(n.element,'limit')?.getAttribute('velocity'))})),getLanguage:()=>lang,showPanel:name=>setPanel(name,true),refreshLayout:refreshWorkspace,
+    beforePose:()=>{clearSurfaceMeasurement();statics.prepareMotion({preserveGround:true});motion?.restoreGround();},
     onPose:()=>{viewer.redraw();queueLinkMeasurementUpdate();queueJointAngleUpdate();statics.requestProjection();},
-    getGround:()=>{const inverse=viewer.world.quaternion.clone().invert(),normal=new THREE.Vector3(0,1,0).applyQuaternion(inverse),point=new THREE.Vector3(0,viewer.plane.position.y,0);viewer.world.worldToLocal(point);return {normal:normal.toArray(),offset:normal.dot(point)};}
+    getGround:()=>{viewer.world.updateWorldMatrix(true,false);viewer.plane.updateWorldMatrix(true,false);const inverse=viewer.world.getWorldQuaternion(new THREE.Quaternion()).invert(),normal=new THREE.Vector3(0,0,1).applyQuaternion(viewer.plane.getWorldQuaternion(new THREE.Quaternion())).applyQuaternion(inverse).normalize(),point=viewer.plane.getWorldPosition(new THREE.Vector3());viewer.world.worldToLocal(point);return {normal:normal.toArray(),offset:normal.dot(point)};}
   });
   $('help').onclick=()=>{$('help-dialog').showModal();$('help-content').scrollTop=0;};$('close-help').onclick=()=>$('help-dialog').close();
   function translate(){document.documentElement.lang=lang==='zh'?'zh-CN':'en';$$('[data-i18n]').forEach(el=>el.textContent=t(el.dataset.i18n));$('language').textContent=lang==='zh'?'EN':'中文';$('joint-search').placeholder=lang==='zh'?'搜索关节…':'Search joints…';renderURDFHelp($('help-content'),lang);updateEditor();filterJoints();refreshWorkspace();statics?.languageChanged();motion?.languageChanged();updateLinkMeasureUI();updateLinkMeasurement();if(surfaceSnap.pointer)renderSurfaceSnap();if(viewer.robot){$('model-meta').textContent=`${Object.keys(viewer.robot.links).length} ${t('linkTotal')} · ${Object.keys(viewer.robot.joints).length} ${t('jointTotal')}`;}}

@@ -1735,3 +1735,17 @@ body.motion-open .view-help {display:none;}
   .workspace-tabs [role=tab] {padding:3px 5px;}
 }
 .workspace-content .panel-motion .panel-header h2 {display:block;font-size:12px;}
+
+/* Direct base pose editing stays beside the clicked body, independent of joint dragging. */
+#motion-body-editor {position:fixed;z-index:32;width:288px;max-width:calc(100vw - 24px);padding:12px;border:1px solid var(--focus);border-radius:12px;background:var(--panel);color:var(--text);box-shadow:0 8px 28px var(--shadow);overflow:auto;overscroll-behavior:contain;}
+#motion-body-editor header {display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+#motion-body-editor header strong {font-size:12px;white-space:nowrap;}
+#motion-body-editor header span {font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#motion-body-close {margin-left:auto;min-height:24px;padding:0 7px;border:0;font-size:19px;}
+#motion-body-editor input {width:100%;min-width:0;padding:5px 6px;}
+#motion-body-editor .motion-field {margin:4px 0;}
+#motion-body-editor p {font-size:10px;line-height:1.6;margin:8px 0;}
+#motion-body-editor .motion-actions {margin:8px 0 0;}
+#motion-body-feedback:empty {display:none;}
+#motion-body-feedback {color:var(--muted);}
+#motion-body-feedback.error {color:#ff9d9d;}
