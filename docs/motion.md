@@ -8,13 +8,13 @@
 
 点击顶部“轨迹”或左侧“轨迹”标签。编辑器记录**独立关节 + 机身六自由度姿态**，不修改 URDF 文件。
 
-1. 调整站姿，点击“记录姿态”，首帧时间为 `0 s`。
+1. 点击“默认站姿并接地”：`hip=0、thigh=0.8、calf=−1.5 rad`（遵守 URDF 限位）。人形或其他命名模型可手动调姿，再点“按当前站姿固定地面”。然后记录首帧 `0 s`。
 2. 在关节标签中拖动连杆、滑块或输入关节值；在轨迹标签中设置机身 XYZ、Roll / Pitch / Yaw，也可单击三维机身，在旁边的浮动编辑框中直接修改，并记录或更新关键帧。
 3. 设置“下次记录时间”，再次记录。选择已有帧后，“更新帧”将当前三维姿态写回该帧；单纯拖动模型不会自动覆盖关键帧。
 4. 点击时间轴菱形选择关键帧；拖动菱形或修改帧时间调整节奏。首帧固定在 0 秒。时间滑块用于预览，支持逐采样帧、变速、循环、撤销和重做。时间轴的 ⌖ 按钮适应整段轨迹；轨迹栏内 Ctrl + S 保存动作工程。
 5. 用“保存工程”导出可再次编辑的 `.motion.json`；用“导出参考”按指定 Hz 输出 JSON，或 CSV + 元数据 JSON。
 
-进入轨迹模式后，地面的位置和朝向保持固定，播放、调姿和适应视图不会使地面跟随机器人。进入模式时不会自动重新取景；可使用时间轴的 ⌖ 按钮查看整段动作。
+参考地面按初始站姿的足端 / 轮底接触建立，固定为 **Z=0、Z 轴向上**；机身 Z 显示根连杆原点的离地高度。命名足端不共面（间隙超过 5 mm）或机身穿地时会提示调整，不会强行移动足端。后续调姿、播放和适应视图不会移动地面。已有关键帧时，默认站姿只改变当前预览，保留关键帧和参考地面；重新标定地面需“新建动作”，可撤销。进入模式不会自动重新取景，可用时间轴的 ⌖ 查看整段动作。
 
 ### 插值与空翻
 
@@ -36,9 +36,9 @@
 - `schema: urdf-viewer.motion.v1`：可编辑工程，包含模型签名、关键帧、插值和采样设置。导入需匹配当前模型名称、根连杆、独立关节名称、类型及顺序，并按当前 URDF 限位校验。
 - `schema: urdf-viewer.reference.v1`：采样参考。`frames` 每行包含 `time`、`base_position`、`base_rpy`、`base_quaternion`、`joint_positions`，以及机身线 / 角速度、线 / 角加速度、关节速度与加速度。
 - 时间为秒，平移为米，旋转为弧度；四元数顺序为 **xyzw**，相邻采样的四元数保持符号连续。
-- 机身坐标位于 **URDF 根连杆的父坐标系**，未乘以浏览器的向上轴显示旋转。RPY 对应 `Rz(yaw) Ry(pitch) Rx(roll)`。角速度为父坐标系表达的空间角速度，**不是 RPY 的直接差分**。
+- 新工程的机身位姿、线 / 角速度和加速度均在**固定地面坐标系**表达。RPY 对应 `Rz(yaw) Ry(pitch) Rx(roll)`。角速度为空间角速度，**不是 RPY 的直接差分**。
 - `metadata.independent_joints` 明确数组关节顺序；移动关节单位为米，其余为弧度。mimic 关节不独立导出，可由 URDF 约束还原。内部 floating / planar 关节暂不支持记录。
-- `metadata.ground_plane` 给出 URDF 父坐标中的地面法向量与偏移，满足 `normal · position = offset`。根坐标高度不自动归零；接入仿真器时需对齐坐标轴、地面高度及关节名称。
+- 工程的 `reference`（采样数据的 `metadata.reference_transform`）保存初始站姿、接触点及地面到 URDF 根父坐标系的变换：`p_urdf = origin + R(quaternion) · p_ground`，`q_urdf = quaternion ⊗ q_ground`。新工程的 `metadata.ground_plane` 为 `{normal:[0,0,1], offset:0}`；`urdf_ground_plane` 保留原模型坐标中的平面。缺少 `reference` 的旧工程继续使用原 URDF 父坐标，不会被自动平移。
 - 采样包含最后一个关键帧时刻；总时长不整除采样间隔时，最后一段间隔更短。导数由插值函数解析计算，在线性拐点等不可微位置采用所在段的单侧值。
 - `diagnostics` 给出采样得到的关节峰值速度及 URDF 速度超限关节。位置遵守 URDF 限位，速度超限不会自动修改动作节奏。
 - 循环只是回到起点播放，**不自动修复首尾位置 / 速度接缝**。有限角度关节的相同姿态、连续旋转的圈数和机身四元数需分别判断。
@@ -49,13 +49,13 @@
 
 Open **Motion** from the toolbar or left workspace. Each keyframe stores independent joint positions and the base's six-degree-of-freedom pose without changing the URDF.
 
-1. Set a pose and record the first key at `0 s`.
+1. Choose **Default stand & ground** (`hip=0, thigh=0.8, calf=−1.5 rad`, clamped to URDF limits), or pose a humanoid / other model manually and choose **Set ground from stance**. Record the first key at `0 s`.
 2. Adjust links or joint sliders in Joints; edit base XYZ and Roll / Pitch / Yaw in Motion, or click the 3D chassis to edit them beside the model and record or update a key.
 3. Set the next recording time and record again. Select a key and use **Update key** to replace its pose; posing the robot alone does not overwrite a key.
 4. Select or drag timeline diamonds, or edit key times. The first key remains at zero. Scrub, step by one sample, adjust playback speed, loop, undo, or redo. Use ⌖ to fit the whole trajectory; Ctrl + S inside Motion saves the project.
 5. Save `.motion.json` for further editing. Export sampled references as JSON or CSV with a metadata JSON sidecar at your chosen Hz.
 
-Motion mode holds the ground position and orientation fixed during posing, playback, and fitting the view. Entering the mode does not automatically refit the camera; use the timeline’s ⌖ button to fit the entire motion.
+The initial foot / wheel contacts define a fixed **Z-up ground frame with the surface at Z=0**. Base Z is the root origin’s height above that surface. Named supports more than 5 mm apart in height, or body penetration, require adjusting the stance first. Posing, playback, and fitting the view keep this floor fixed. With existing keys, the standing preset changes only the current preview; keys and their reference remain intact. Use **New motion** to recalibrate; setup is undoable. Entering Motion does not refit the camera; use ⌖ to fit the whole trajectory.
 
 ### Interpolation and flips
 
@@ -77,9 +77,9 @@ For +Z-up models, the front/back flip sketches animate base pose and preserve th
 - Editable projects use `urdf-viewer.motion.v1`. Imports must match the current model, root, independent joint names, types, and order; joint limits come from the current URDF.
 - Sampled references use `urdf-viewer.reference.v1`. Each frame includes time, base position / RPY / quaternion, joint positions, base linear / angular velocity and acceleration, and joint velocity / acceleration.
 - Units are seconds, meters, and radians. Quaternion order is **xyzw**, with continuous signs between samples.
-- Base coordinates use the **URDF root's parent frame**, before the viewer's up-axis rotation. RPY means `Rz(yaw) Ry(pitch) Rx(roll)`. Angular velocity is spatial, expressed in the parent frame, rather than differentiated Euler angles.
+- New projects express base pose, linear / angular velocity, and acceleration in the **fixed ground frame**. RPY means `Rz(yaw) Ry(pitch) Rx(roll)`. Angular velocity is spatial rather than differentiated Euler angles.
 - `metadata.independent_joints` defines array order; prismatic positions are meters. Mimic joints are excluded and reconstructed from URDF constraints. Internal floating / planar joints are not supported for recording.
-- `metadata.ground_plane` defines `normal · position = offset` in the URDF parent frame. Root height is not automatically ground-normalized. Map axes, ground height, and joint names to your simulator.
+- Project `reference` (sampled `metadata.reference_transform`) stores the initial stance, contacts, and ground-to-URDF-parent transform: `p_urdf = origin + R(quaternion) · p_ground`, `q_urdf = quaternion ⊗ q_ground`. New `metadata.ground_plane` is `{normal:[0,0,1], offset:0}`; `urdf_ground_plane` preserves the plane in native model coordinates. Legacy projects without `reference` retain their original URDF-parent coordinates without automatic shifting.
 - Sampling includes the exact final key; the final interval may be shorter than `1 / fps`. Derivatives are analytical and piecewise, with one-sided values at nonsmooth knots.
 - `diagnostics` reports sampled peak joint speeds and URDF velocity-limit violations. Joint position limits are enforced; speed violations do not retime the motion automatically.
 - Loop playback restarts at zero; it does **not** repair pose or velocity discontinuities at the seam.

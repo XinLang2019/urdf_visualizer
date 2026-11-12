@@ -2,6 +2,7 @@
 import json
 from model_interaction import rendered_frame, pointer
 from motion_body import check_motion_body
+from standing_reference import check_standing_reference
 
 
 def check_trajectory_editor(client,output,check):
@@ -29,6 +30,7 @@ def check_trajectory_editor(client,output,check):
     })()''')
     assert all(math_result.values()),math_result
     print('PASS analytic interpolation derivatives, nonuniform cubic continuity/limits, full-turn RPY vs SLERP, endpoint sampling, CSV and validation',flush=True)
+    check_standing_reference(client,output,check)
     client.js('''window.motionInitial={position:urdfWorkbench.viewer.robot.position.toArray(),quaternion:urdfWorkbench.viewer.robot.quaternion.toArray(),joints:Object.fromEntries(Object.entries(urdfWorkbench.viewer.robot.joints).map(([n,j])=>[n,j.angle]))};document.getElementById('animate').click()''')
     check(client,'!document.getElementById("motion-panel").hidden&&!document.getElementById("motion-timeline").hidden&&!urdfWorkbench.motion.playing','Motion opens an empty keyframe editor instead of sinusoidal animation')
     client.js('document.getElementById("motion-record").click()')
@@ -36,7 +38,7 @@ def check_trajectory_editor(client,output,check):
     client.js('document.getElementById("motion-root-4").value="360";document.getElementById("motion-root-4").dispatchEvent(new Event("change"));document.getElementById("motion-root-2").value="1.2";document.getElementById("motion-root-2").dispatchEvent(new Event("change"));document.getElementById("motion-record").click()')
     check(client,'urdfWorkbench.motion.project.keyframes.length===2&&Math.abs(urdfWorkbench.motion.project.keyframes[1].base.rpy[1]-2*Math.PI)<1e-9','editing base Pitch to 360 degrees preserves winding when recording')
     client.js('document.getElementById("motion-cursor").value=".25";document.getElementById("motion-cursor").dispatchEvent(new Event("input"))');rendered_frame(client)
-    check(client,'Math.abs(urdfWorkbench.viewer.robot.quaternion.y)>.999&&Math.abs(urdfWorkbench.viewer.robot.position.z-.6)<1e-6','scrubbing applies halfway full-flip orientation and base translation in 3D')
+    check(client,'Math.abs(urdfWorkbench.viewer.robot.quaternion.y)>.999&&Math.abs(urdfWorkbench.viewer.robot.position.z-(urdfWorkbench.motion.project.reference.origin[2]+(urdfWorkbench.motion.project.keyframes[0].base.position[2]+1.2)/2))<1e-6','scrubbing applies halfway full-flip orientation and base translation in 3D')
     client.js('document.getElementById("statics-toggle").click();document.getElementById("motion-play").click()')
     rendered_frame(client)
     check(client,'(urdfWorkbench.motion.playing||urdfWorkbench.motion.time===.5)&&!urdfWorkbench.statics.enabled','playback suspends quasi-static torque labels')
@@ -102,14 +104,14 @@ def check_motion_models(client,check):
     transfer='''(()=>{const transfer=new DataTransfer();transfer.items.add(new File([JSON.stringify(PROJECT)],'motion.json',{type:'application/json'}));const input=document.getElementById('motion-import');input.files=transfer.files;input.dispatchEvent(new Event('change'));})()'''
     client.js('document.getElementById("example-select").value="urdf/g1/urdf/g1.urdf";document.getElementById("load-example").click()')
     client.until('urdfWorkbench.viewer.robot?.robotName!=="go2_description"&&!urdfWorkbench.loading',55)
-    client.js('document.getElementById("animate").click();document.getElementById("motion-record").click();document.getElementById("motion-root-3").value="20";document.getElementById("motion-root-3").dispatchEvent(new Event("change"));document.getElementById("motion-record").click()')
+    client.js('document.getElementById("animate").click();document.getElementById("motion-set-ground").click();document.getElementById("motion-record").click();document.getElementById("motion-root-3").value="20";document.getElementById("motion-root-3").dispatchEvent(new Event("change"));document.getElementById("motion-record").click()')
     check(client,'urdfWorkbench.motion.project.model.joints.length>12&&urdfWorkbench.motion.project.keyframes.every(f=>f.joints.length===urdfWorkbench.motion.project.model.joints.length)','G1 humanoid captures every independent joint together with the base pose')
     empty=client.js('(()=>{const p=urdfWorkbench.motion.project;p.keyframes=[];return p})()')
     client.js(transfer.replace('PROJECT',json.dumps(empty)));rendered_frame(client)
     fixture='''<robot name="motion_dofs"><link name="base"><visual><geometry><box size=".2 .2 .2"/></geometry></visual></link><link name="slide"/><joint name="slider" type="prismatic"><parent link="base"/><child link="slide"/><axis xyz="0 0 1"/><limit lower="0" upper="1" effort="10" velocity="1"/></joint><link name="spin"/><joint name="spinner" type="continuous"><parent link="slide"/><child link="spin"/><axis xyz="0 1 0"/><limit effort="10" velocity="1"/></joint><link name="mimic"/><joint name="follower" type="continuous"><parent link="spin"/><child link="mimic"/><axis xyz="0 1 0"/><mimic joint="spinner" multiplier="2" offset=".1"/></joint></robot>'''
     client.js('document.getElementById("source").value='+json.dumps(fixture)+';document.getElementById("source").dispatchEvent(new Event("input"));document.getElementById("reload").click()')
     client.until('urdfWorkbench.viewer.robot?.robotName==="motion_dofs"&&!urdfWorkbench.loading')
-    client.js('document.getElementById("motion-record").click();urdfWorkbench.viewer.setJointValue("slider",.4);urdfWorkbench.viewer.setJointValue("spinner",4*Math.PI);document.getElementById("motion-record").click();document.getElementById("motion-cursor").value=".25";document.getElementById("motion-cursor").dispatchEvent(new Event("input"))')
+    client.js('document.getElementById("motion-set-ground").click();document.getElementById("motion-record").click();urdfWorkbench.viewer.setJointValue("slider",.4);urdfWorkbench.viewer.setJointValue("spinner",4*Math.PI);document.getElementById("motion-record").click();document.getElementById("motion-cursor").value=".25";document.getElementById("motion-cursor").dispatchEvent(new Event("input"))')
     check(client,'(()=>{const p=urdfWorkbench.motion.project,j=urdfWorkbench.viewer.robot.joints;return p.model.joints.length===2&&p.model.joints[0].type==="prismatic"&&p.model.joints[1].type==="continuous"&&Math.abs(j.slider.angle-.2)<1e-6&&Math.abs(j.spinner.angle-2*Math.PI)<1e-6&&Math.abs(j.follower.angle-(4*Math.PI+.1))<1e-6})()','prismatic meters, continuous-joint winding and mimic propagation remain correct during playback')
     check(client,'urdfWorkbench.motion.project.model.joints.every(j=>j.velocity===1)','motion metadata reads actual URDF velocity limits')
     # Front/back naming follows URDF +X forward: positive pitch points the nose down.

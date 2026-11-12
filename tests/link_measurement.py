@@ -69,6 +69,7 @@ def check_link_measurement(client, output, check):
     client.js('urdfWorkbench.viewer.setJointValue("knee_joint",0)')
     rendered_frame(client)
     click(client, 'animate')
+    click(client, 'motion-set-ground')
     click(client, 'motion-record')
     client.js('urdfWorkbench.viewer.setJointValue("knee_joint",.5)')
     click(client, 'motion-record')

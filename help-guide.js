@@ -15,7 +15,7 @@
         {title:'静力学与斜坡',image:'slope-statics.png',alt:'四足贴合斜坡，显示关节力矩、机身角度与接触力',
           lines:['调好站姿，开启“受力分析”；点击力矩标签查看力与力臂，再次点击恢复。','设置坡度、坡向和摩擦系数，点击“一键贴合斜坡”，查看机身角度与轮轴力矩。']}
       ],
-      motionTitle:'关键帧动作轨迹',motionNote:'顶部“轨迹”打开编排器，地面保持固定；点击机身可直接编辑 XYZ / RPY。调好姿态 → 设置时间并记录 → 选择插值 → 时间轴回放。Pitch 支持 ±360° 空翻，参考轨迹可导出 JSON / CSV。',
+      motionTitle:'关键帧动作轨迹',motionNote:'顶部“轨迹”打开编排器。先点“默认站姿并接地”（hip=0、thigh=0.8、calf=−1.5 rad），或手动调姿后固定地面。后续动作以固定地面 Z=0 为基准，机身 Z 为离地高度。点击机身编辑 XYZ / RPY → 记录关键帧 → 插值回放。Pitch 支持 ±360° 空翻，参考轨迹可导出 JSON / CSV。',
       saveTitle:'编辑与保存',save:'应用代码到模型',write:'保存回源文件',
       saveNote:'编辑器内 Ctrl + S 保存源文件；轨迹栏内保存动作工程。源文件首次保存可能需要授权，保存后需重新加载应用代码。',
       controlsTitle:'视图快捷操作',
@@ -36,7 +36,7 @@
         {title:'Statics & slopes',image:'slope-statics.png',alt:'Robot fitted to a slope with joint torques, body attitude, and contact forces',
           lines:['Set a standing pose and enable Statics. Click a torque label for forces and moment arms; click again to restore labels.','Set slope angle, heading, and friction, then Fit supports to slope. Inspect body attitude and wheel holding torques.']}
       ],
-      motionTitle:'Keyframe motion',motionNote:'Motion keeps the ground fixed. Click the chassis to edit XYZ / RPY. Pose the joints and base → set a time and record → choose interpolation → preview the timeline. Pitch retains ±360° flips. Export JSON / CSV reference data.',
+      motionTitle:'Keyframe motion',motionNote:'Start with Default stand & ground (hip=0, thigh=0.8, calf=−1.5 rad), or pose manually and set the ground. Motion uses this fixed Z=0 floor; base Z is height above ground. Click the chassis to edit XYZ / RPY → record keys → interpolate and preview. Pitch retains ±360° flips. Export JSON / CSV reference data.',
       saveTitle:'Edit & save',save:'Apply code to model',write:'Save back to source',
       saveNote:'Ctrl + S saves source in the editor, or a motion project in Motion. Source saving may need permission. Reload to apply saved code to the model.',
       controlsTitle:'View controls',

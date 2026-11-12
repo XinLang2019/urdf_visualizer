@@ -252,6 +252,22 @@ window.createStaticsWorkbench=function({THREE,viewer,grid,refreshScene,getModel,
     }
   }
   function requestProjection(){if(enabled&&!projectionFrame)projectionFrame=requestAnimationFrame(renderProjection);}
+  // Pure geometric query for motion setup. Never moves the robot or ground.
+  function motionSupportPlane(normal=new THREE.Vector3(0,1,0)) {
+    if(!model||model.version!==getModel().version)buildModel();
+    if(!model)throw Error(txt('请先加载模型','Load a model first'));
+    viewer.world.updateWorldMatrix(true,true);normal=normal.clone().normalize();
+    const rotation=new THREE.Quaternion().setFromUnitVectors(normal,new THREE.Vector3(0,1,0)),frame={toPlane:new THREE.Matrix4().makeRotationFromQuaternion(rotation)};
+    const leaves=model.shapes.filter(s=>!model.shapes.some(other=>{if(other===s)return false;for(let p=other.object.parent;p;p=p.parent)if(p===s.object)return true;return false;}));
+    const all=model.shapes.map(s=>({shape:s,bottom:contactGeometry.bottom(s,frame)})).filter(s=>Number.isFinite(s.bottom.min));
+    const terminal=all.filter(s=>leaves.includes(s.shape)),named=terminal.filter(s=>/(^|[_\W])(foot|feet|toe|wheel|ankle|sole)([_\W]|$)/i.test(s.shape.link));
+    const minimum=Math.min(...terminal.map(s=>s.bottom.min)),supports=named.length?named:terminal.filter(s=>s.bottom.min<=minimum+.005);
+    if(!supports.length)throw Error(txt('没有可用的足端或轮子几何','No usable foot or wheel geometry'));
+    const offset=Math.min(...supports.map(s=>s.bottom.min)),maxGap=Math.max(...supports.map(s=>s.bottom.min))-offset;
+    if(maxGap>.005+1e-8)throw Error(txt('足端不共面，请先调好站姿再固定地面。最大间隙：','Feet are not coplanar; adjust the stance first. Maximum gap: ')+(maxGap*1000).toFixed(2)+' mm');
+    if(all.some(s=>s.bottom.min<offset-.005))throw Error(txt('机身或其他连杆会穿过参考地面，请调整站姿','The body or another link would penetrate the reference ground'));
+    return {normal:normal.toArray(),offset,maxGap,tolerance:.005,contacts:supports.flatMap(s=>s.bottom.points.map(p=>({link:s.shape.link,position:new THREE.Vector3(...p).applyQuaternion(rotation.clone().invert()).toArray(),estimated:s.shape.fallback}))),links:supports.map(s=>s.shape.link)};
+  }
   $('statics-toggle').onclick=()=>toggle();$('statics-enable').onclick=()=>toggle();
   $('right-statics-tab').onclick=()=>{setRightView('statics');if(!enabled)toggle(true);};$('right-code-tab').onclick=()=>setRightView('code');
   document.querySelector('.right-tabs').onkeydown=event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const view=event.key==='Home'?'code':event.key==='End'?'statics':rightView==='code'?'statics':'code';$(`right-${view}-tab`).click();$(`right-${view}-tab`).focus();}};
@@ -271,6 +287,7 @@ window.createStaticsWorkbench=function({THREE,viewer,grid,refreshScene,getModel,
   window.addEventListener('keydown',event=>{if(event.key==='Escape'&&pinned&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){pinned=null;render();requestProjection();}});
   viewer.addEventListener('angle-change',requestSolve);viewer.controls.addEventListener('change',requestProjection);window.addEventListener('resize',requestProjection);
   return {get enabled(){return enabled;},get view(){return rightView;},get snapshot(){return result?JSON.parse(JSON.stringify({...result,enabled,ground,terrain:terrain.snapshot,selected,inspection:pinned,visibleLabels:[...labels].filter(([,label])=>!label.hidden).map(([name])=>name),leverBreakdown:pinned?engine.leverBreakdown(result,pinned):null,missingMasses:model?.missing||[]})):{enabled,valid:false};},requestSolve,requestProjection,setRightView,selectJoint,
+    motionSupportPlane,
     prepareMotion({preserveGround=false}={}){if(enabled)toggle(false);if(terrain.active&&!preserveGround){terrain.reset(false);ground=null;renderTerrain();}},
     modelChanged(){terrain.reset(false);buildModel();result=null;updateEmphasis();refreshAxes();if(enabled)requestSolve();else render();},
     syncTerrainEnvironment(){terrain.sync();},

@@ -9,13 +9,21 @@ window.createTrajectoryCore=function(T){
     if(!p||p.schema!=='urdf-viewer.motion.v1')throw Error('Invalid motion project schema');
     if(typeof p.name!=='string'||p.name.length>160||!Array.isArray(p.keyframes)||p.keyframes.length>2000)throw Error('Invalid project or keyframe count');
     if(!rotations.includes(p.rotation)||!finite(p.fps)||p.fps<1||p.fps>1000)throw Error('Invalid orientation mode or sample rate');
+    if(p.reference!==undefined&&p.reference!==null){
+      const r=p.reference;
+      if(r.kind!=='fixed-ground'||!Array.isArray(r.origin)||r.origin.length!==3||!r.origin.every(finite)||!Array.isArray(r.quaternion)||r.quaternion.length!==4||!r.quaternion.every(finite)||Math.abs(Math.hypot(...r.quaternion)-1)>1e-6)throw Error('Invalid fixed-ground reference transform');
+    }
     if(!p.model||p.model.name!==model.name||p.model.root!==model.root||!Array.isArray(p.model.joints)||p.model.joints.length!==model.joints.length||p.model.joints.some((j,i)=>j.name!==model.joints[i].name||j.type!==model.joints[i].type))throw Error('Model / joint order mismatch');
     let previous=-1;
     const vector=(v,n)=>Array.isArray(v)&&v.length===n&&v.every(finite);
-    for(const f of p.keyframes){
-      if(!finite(f.time)||f.time<0||f.time>3600||f.time-previous<1e-4||!modes.includes(f.interpolation)||typeof f.label!=='string'||f.label.length>160)throw Error('Invalid keyframe time, order or interpolation');
+    const validPose=f=>{
       if(!vector(f.base?.position,3)||!vector(f.base?.rpy,3)||!vector(f.joints,model.joints.length))throw Error('Invalid pose values');
       f.joints.forEach((v,i)=>{const j=model.joints[i];if((finite(j.lower)&&v<j.lower-1e-9)||(finite(j.upper)&&v>j.upper+1e-9))throw Error('Joint outside URDF limits: '+j.name);});
+    };
+    if(p.reference?.initialStandingPose)validPose(p.reference.initialStandingPose);
+    for(const f of p.keyframes){
+      if(!finite(f.time)||f.time<0||f.time>3600||f.time-previous<1e-4||!modes.includes(f.interpolation)||typeof f.label!=='string'||f.label.length>160)throw Error('Invalid keyframe time, order or interpolation');
+      validPose(f);
       previous=f.time;
     }
     if(p.keyframes.length&&p.keyframes[0].time!==0)throw Error('The first keyframe must start at 0 s');
@@ -87,7 +95,7 @@ window.createTrajectoryCore=function(T){
       previous=f.base_quaternion;frames.push(f);f.joint_velocities.forEach((v,j)=>peak[j]=Math.max(peak[j],Math.abs(v)));
       if(i%250===249)await new Promise(resolve=>setTimeout(resolve,0));
     }
-    return {schema:'urdf-viewer.reference.v1',name:p.name,fps,duration:end,metadata:{frame:'URDF root parent (before viewer up-axis rotation)',position_unit:'m',angle_unit:'rad',quaternion_order:'xyzw',rpy_convention:'Rz(yaw) Ry(pitch) Rx(roll), unwrapped input',velocity_frame:'root parent; angular velocity is spatial, not RPY rates',independent_joints:p.model.joints.map(j=>j.name),joint_units:p.model.joints.map(j=>j.type==='prismatic'?'m':'rad'),mimic:'Excluded; reproduce from URDF constraints',display_up_axis:p.model.up,ground_plane:p.model.groundPlane,kinematic_only:true,derivatives:'Analytic, piecewise; linear velocities and cubic accelerations may jump at knots. Last row is the exact endpoint (possibly a shorter interval).',rotation:p.rotation,loop:p.loop,loop_seam_validated:false},diagnostics:{sampled_peak_joint_speeds:peak,velocity_limit_exceeded:p.model.joints.filter((j,i)=>finite(j.velocity)&&peak[i]>j.velocity+1e-8).map(j=>j.name)},frames};
+    return {schema:'urdf-viewer.reference.v1',name:p.name,fps,duration:end,metadata:{frame:p.reference?'fixed ground (Z up, ground at Z = 0)':'URDF root parent (before viewer up-axis rotation)',reference_transform:p.reference||null,position_unit:'m',angle_unit:'rad',quaternion_order:'xyzw',rpy_convention:'Rz(yaw) Ry(pitch) Rx(roll), unwrapped input',velocity_frame:p.reference?'fixed ground; angular velocity is spatial, not RPY rates':'root parent; angular velocity is spatial, not RPY rates',independent_joints:p.model.joints.map(j=>j.name),joint_units:p.model.joints.map(j=>j.type==='prismatic'?'m':'rad'),mimic:'Excluded; reproduce from URDF constraints',display_up_axis:p.model.up,ground_plane:p.reference?{normal:[0,0,1],offset:0}:p.model.groundPlane,urdf_ground_plane:p.model.groundPlane,kinematic_only:true,derivatives:'Analytic, piecewise; linear velocities and cubic accelerations may jump at knots. Last row is the exact endpoint (possibly a shorter interval).',rotation:p.rotation,loop:p.loop,loop_seam_validated:false},diagnostics:{sampled_peak_joint_speeds:peak,velocity_limit_exceeded:p.model.joints.filter((j,i)=>finite(j.velocity)&&peak[i]>j.velocity+1e-8).map(j=>j.name)},frames};
   }
   function csv(data){
     const jointNames=data.metadata.independent_joints,fields=[['base_position',['x','y','z']],['base_rpy',['roll','pitch','yaw']],['base_quaternion',['x','y','z','w']],['base_linear_velocity',['x','y','z']],['base_angular_velocity',['x','y','z']],['base_linear_acceleration',['x','y','z']],['base_angular_acceleration',['x','y','z']],['joint_positions',jointNames],['joint_velocities',jointNames],['joint_accelerations',jointNames]];
