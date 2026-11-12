@@ -5,6 +5,8 @@ window.createTrajectoryCore=function(T){
   const finite=Number.isFinite,clone=x=>JSON.parse(JSON.stringify(x));
   const quaternion=rpy=>new T.Quaternion().setFromEuler(new T.Euler(...rpy,'ZYX'));
   const duration=p=>p?.keyframes.at(-1)?.time||0;
+  let optimizationMath;
+  const optimizer=()=>optimizationMath||(optimizationMath=createTrajectoryOptimizer(T,{clone,duration}));
   function validate(p,model){
     if(!p||p.schema!=='urdf-viewer.motion.v1')throw Error('Invalid motion project schema');
     if(typeof p.name!=='string'||p.name.length>160||!Array.isArray(p.keyframes)||p.keyframes.length>2000)throw Error('Invalid project or keyframe count');
@@ -23,11 +25,15 @@ window.createTrajectoryCore=function(T){
     if(p.reference?.initialStandingPose)validPose(p.reference.initialStandingPose);
     for(const f of p.keyframes){
       if(!finite(f.time)||f.time<0||f.time>3600||f.time-previous<1e-4||!modes.includes(f.interpolation)||typeof f.label!=='string'||f.label.length>160)throw Error('Invalid keyframe time, order or interpolation');
+      if(f.phase!==undefined&&!['free','support','flight'].includes(f.phase)||f.supports!==undefined&&(!Array.isArray(f.supports)||f.supports.some(n=>typeof n!=='string'||!p.reference?.supports?.includes(n))))throw Error('Invalid support phase or foot selection');
       validPose(f);
       previous=f.time;
     }
     if(p.keyframes.length&&p.keyframes[0].time!==0)throw Error('The first keyframe must start at 0 s');
-    return {...clone(p),model:clone(model),loop:!!p.loop};
+    const result={...clone(p),model:clone(model),loop:!!p.loop};
+    if(result.optimizerSettings)optimizer().settings(result.optimizerSettings);
+    if(result.optimization)optimizer().validate(result);
+    return result;
   }
   function ease(mode,u){
     if(mode==='smoothstep')return [u*u*(3-2*u),6*u*(1-u),6-12*u];
@@ -61,8 +67,12 @@ window.createTrajectoryCore=function(T){
     const stationary=fs.length===1||time<0||time>end;
     const h=stationary?1:fs[k+1].time-fs[k].time,u=stationary?0:(t-fs[k].time)/h,mode=fs[k].interpolation;
     const channel=get=>stationary?[get(time>end?fs.at(-1):fs[0]),0,0]:scalar(fs,k,get,u,h,mode);
-    const position=[0,1,2].map(i=>channel(f=>f.base.position[i])),angles=[0,1,2].map(i=>channel(f=>f.base.rpy[i]));
-    const joints=p.model.joints.map((j,i)=>channel(f=>f.joints[i]));
+    let position,angles,joints;
+    if(p.optimization){
+      if(p.optimization.signature!==optimizer().signature(p))throw Error('Optimized trajectory is stale; run optimization again');
+      const solved=optimizer().evaluate(p.optimization.knots,time),get=i=>[solved.position[i],solved.velocity[i],solved.acceleration[i]];
+      position=[0,1,2].map(get);angles=[3,4,5].map(get);joints=p.model.joints.map((j,i)=>get(i+6));
+    }else{position=[0,1,2].map(i=>channel(f=>f.base.position[i]));angles=[0,1,2].map(i=>channel(f=>f.base.rpy[i]));joints=p.model.joints.map((j,i)=>channel(f=>f.joints[i]));}
     let rpy=angles.map(c=>c[0]),q=quaternion(rpy),omega,alpha;
     if(p.rotation==='slerp'&&!stationary){
       const a=quaternion(fs[k].base.rpy),b=quaternion(fs[k+1].base.rpy);
@@ -95,7 +105,7 @@ window.createTrajectoryCore=function(T){
       previous=f.base_quaternion;frames.push(f);f.joint_velocities.forEach((v,j)=>peak[j]=Math.max(peak[j],Math.abs(v)));
       if(i%250===249)await new Promise(resolve=>setTimeout(resolve,0));
     }
-    return {schema:'urdf-viewer.reference.v1',name:p.name,fps,duration:end,metadata:{frame:p.reference?'fixed ground (Z up, ground at Z = 0)':'URDF root parent (before viewer up-axis rotation)',reference_transform:p.reference||null,position_unit:'m',angle_unit:'rad',quaternion_order:'xyzw',rpy_convention:'Rz(yaw) Ry(pitch) Rx(roll), unwrapped input',velocity_frame:p.reference?'fixed ground; angular velocity is spatial, not RPY rates':'root parent; angular velocity is spatial, not RPY rates',independent_joints:p.model.joints.map(j=>j.name),joint_units:p.model.joints.map(j=>j.type==='prismatic'?'m':'rad'),mimic:'Excluded; reproduce from URDF constraints',display_up_axis:p.model.up,ground_plane:p.reference?{normal:[0,0,1],offset:0}:p.model.groundPlane,urdf_ground_plane:p.model.groundPlane,kinematic_only:true,derivatives:'Analytic, piecewise; linear velocities and cubic accelerations may jump at knots. Last row is the exact endpoint (possibly a shorter interval).',rotation:p.rotation,loop:p.loop,loop_seam_validated:false},diagnostics:{sampled_peak_joint_speeds:peak,velocity_limit_exceeded:p.model.joints.filter((j,i)=>finite(j.velocity)&&peak[i]>j.velocity+1e-8).map(j=>j.name)},frames};
+    return {schema:'urdf-viewer.reference.v1',name:p.name,fps,duration:end,metadata:{frame:p.reference?'fixed ground (Z up, ground at Z = 0)':'URDF root parent (before viewer up-axis rotation)',reference_transform:p.reference||null,position_unit:'m',angle_unit:'rad',quaternion_order:'xyzw',rpy_convention:'Rz(yaw) Ry(pitch) Rx(roll), unwrapped input',velocity_frame:p.reference?'fixed ground; angular velocity is spatial, not RPY rates':'root parent; angular velocity is spatial, not RPY rates',independent_joints:p.model.joints.map(j=>j.name),joint_units:p.model.joints.map(j=>j.type==='prismatic'?'m':'rad'),mimic:'Excluded; reproduce from URDF constraints',display_up_axis:p.model.up,ground_plane:p.reference?{normal:[0,0,1],offset:0}:p.model.groundPlane,urdf_ground_plane:p.model.groundPlane,kinematic_only:true,optimization:p.optimization?.report||null,derivatives:p.optimization?'Analytic C2 quintic splines; endpoint is exact. Jerk can jump at knots.':'Analytic, piecewise; linear velocities and cubic accelerations may jump at knots. Last row is the exact endpoint (possibly a shorter interval).',rotation:p.rotation,loop:p.loop,loop_seam_validated:false},diagnostics:{sampled_peak_joint_speeds:peak,velocity_limit_exceeded:p.model.joints.filter((j,i)=>finite(j.velocity)&&peak[i]>j.velocity+1e-8).map(j=>j.name)},frames};
   }
   function csv(data){
     const jointNames=data.metadata.independent_joints,fields=[['base_position',['x','y','z']],['base_rpy',['roll','pitch','yaw']],['base_quaternion',['x','y','z','w']],['base_linear_velocity',['x','y','z']],['base_angular_velocity',['x','y','z']],['base_linear_acceleration',['x','y','z']],['base_angular_acceleration',['x','y','z']],['joint_positions',jointNames],['joint_velocities',jointNames],['joint_accelerations',jointNames]];

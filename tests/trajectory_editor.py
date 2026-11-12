@@ -3,6 +3,7 @@ import json
 from model_interaction import rendered_frame, pointer
 from motion_body import check_motion_body
 from standing_reference import check_standing_reference
+from trajectory_optimization import check_trajectory_optimization
 
 
 def check_trajectory_editor(client,output,check):
@@ -31,6 +32,7 @@ def check_trajectory_editor(client,output,check):
     assert all(math_result.values()),math_result
     print('PASS analytic interpolation derivatives, nonuniform cubic continuity/limits, full-turn RPY vs SLERP, endpoint sampling, CSV and validation',flush=True)
     check_standing_reference(client,output,check)
+    check_trajectory_optimization(client,output,check)
     client.js('''window.motionInitial={position:urdfWorkbench.viewer.robot.position.toArray(),quaternion:urdfWorkbench.viewer.robot.quaternion.toArray(),joints:Object.fromEntries(Object.entries(urdfWorkbench.viewer.robot.joints).map(([n,j])=>[n,j.angle]))};document.getElementById('animate').click()''')
     check(client,'!document.getElementById("motion-panel").hidden&&!document.getElementById("motion-timeline").hidden&&!urdfWorkbench.motion.playing','Motion opens an empty keyframe editor instead of sinusoidal animation')
     client.js('document.getElementById("motion-record").click()')

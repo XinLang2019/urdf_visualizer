@@ -25,7 +25,7 @@ Chrome / Edge is recommended. Saving back to a source file requires localhost or
 - **Visual helpers**: visual and collision geometry, centers of mass, equivalent inertia boxes, link frames, and joint axes. Light / dark themes and Chinese / English UI.
 - **3D measurement**: point-to-point or link-origin distance with XYZ components, with up to 5 geometric snap candidates.
 - **Edit and save**: XML highlighting, validation, model reload, and saving edits directly to the source file.
-- **Keyframe motion**: set a default stand, fix the foot-contact ground, author ground-relative base and joint poses, choose four interpolation modes, retain full flip turns, and export sampled JSON / CSV references. [Workflow and data format](docs/motion.md#english).
+- **Keyframe motion**: set a default stand, fix the foot-contact ground, author ground-relative base and joint poses, choose interpolation or constrained kinematic optimization with foot locks and rate-based retiming, retain full flip turns, and export JSON / CSV references. [Workflow and data format](docs/motion.md#english).
 - **Statics**: live joint torques, contact reactions, and moment arms. Configure slope and friction, fit wheels / feet to the ground, and solve body attitude.
 
 | 3D distance and XYZ components | Slope contacts and joint torques |

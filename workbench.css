@@ -1749,3 +1749,10 @@ body.motion-open .view-help {display:none;}
 #motion-body-feedback:empty {display:none;}
 #motion-body-feedback {color:var(--muted);}
 #motion-body-feedback.error {color:#ff9d9d;}
+
+/* Motion contact phases and constrained optimization. */
+.motion-supports {display:flex;flex-wrap:wrap;gap:4px 10px;}
+.motion-supports .motion-field {display:flex;align-items:center;gap:5px;margin:0;font:10px ui-monospace,monospace;}
+.motion-group details summary {cursor:pointer;font-size:11px;color:var(--text);margin:8px 0;}
+.motion-group details .motion-pose-grid {grid-template-columns:repeat(2,minmax(0,1fr));}
+#motion-optimize {background:var(--blue);color:var(--on-accent);}

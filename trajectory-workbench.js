@@ -1,10 +1,11 @@
 'use strict';
 /* Keyframe authoring adapter. Editing poses never edits the URDF source. */
-window.createTrajectoryWorkbench=function({THREE:T,viewer,grid,getLanguage,showPanel,refreshLayout,beforePose,onPose,getGround,getJointInfo,fitBounds,projectPoint,supportPlane,detachGround}){
+window.createTrajectoryWorkbench=function({THREE:T,viewer,grid,getLanguage,showPanel,refreshLayout,beforePose,onPose,getGround,getJointInfo,fitBounds,projectPoint,supportPlane,detachGround,getDescriptionHash}){
   const $=id=>document.getElementById(id),core=createTrajectoryCore(T),clone=core.clone;
   const text=(zh,en)=>getLanguage()==='zh'?zh:en,rad=Math.PI/180;
   const caches=new Map(),undo=[],redo=[];let project=null,model=null,cacheKey='',selected=null,open=false,playing=false,applying=false,time=0,clock=0,startTime=0,speed=1,recordTime=0,dirty=false,serial=1,busy=false,rpy=[0,0,0],channel='base:2';
   let groundLock=null,bodyLink=null,bodyAnchor=null;
+  const optimizer=createTrajectoryOptimizer(T,core);let optimizationRun=0,optimizing=false;
   const bodyEditor=el('section',{id:'motion-body-editor',role:'region',hidden:'','aria-label':text('机身姿态','Base pose')});
   document.body.append(bodyEditor);
   const path=new T.Line(new T.BufferGeometry(),new T.LineBasicMaterial({color:0x6ba3c8,transparent:true,opacity:.7,depthWrite:false}));path.raycast=()=>{};path.visible=false;viewer.world.add(path);
@@ -20,7 +21,7 @@ window.createTrajectoryWorkbench=function({THREE:T,viewer,grid,getLanguage,showP
   const scenePose=()=>({position:viewer.robot.position.toArray(),quaternion:viewer.robot.quaternion.toArray(),joints:model.joints.map(j=>viewer.robot.joints[j.name].angle||0)});
   const floorPose=()=>[viewer.plane,grid].map(o=>({position:o.position.toArray(),quaternion:o.quaternion.toArray(),scale:o.scale.toArray()}));
   const snapshot=()=>({project:clone(project),selected,time,recordTime,dirty,scene:scenePose(),floor:floorPose(),rpy:rpy.slice()});
-  function checkpoint(){undo.push(snapshot());if(undo.length>60)undo.shift();redo.length=0;}
+  function checkpoint(){if(optimizing)optimizationRun++;undo.push(snapshot());if(undo.length>60)undo.shift();redo.length=0;}
   function restore(s){
     pause();({project,selected,time,recordTime,dirty}=clone(s));beforePose();applying=true;
     try{
@@ -35,7 +36,7 @@ window.createTrajectoryWorkbench=function({THREE:T,viewer,grid,getLanguage,showP
     }finally{applying=false;}
     render();drawPath();
   }
-  function history(from,to){if(!from.length)return;to.push(snapshot());restore(from.pop());}
+  function history(from,to){if(!from.length)return;if(optimizing)optimizationRun++;to.push(snapshot());restore(from.pop());}
   function newProject(){return {schema:'urdf-viewer.motion.v1',name:(model?.name||'robot')+'-motion',model:clone(model),rotation:'rpy',fps:60,loop:false,keyframes:[]};}
   function nativePose(position,quaternion){
     if(!project?.reference)return {position:new T.Vector3(...position),quaternion:new T.Quaternion(...quaternion)};
@@ -171,7 +172,7 @@ window.createTrajectoryWorkbench=function({THREE:T,viewer,grid,getLanguage,showP
     if(next>=end){if(project.loop){next%=end;}else{next=end;playing=false;}}
     time=next;apply(core.evaluate(project,time));syncTime();
   }
-  function mark(){dirty=true;render();drawPath();}
+  function mark(){delete project.optimization;dirty=true;render();drawPath();}
   function record(){
     if(!model)throw Error(text('请先加载模型','Load a model first'));
     if(!project.reference&&!project.keyframes.length)throw Error(text('请先生成默认站姿，或按当前站姿固定参考地面。','First create the standing pose or set the ground from the current stance.'));
@@ -194,6 +195,7 @@ window.createTrajectoryWorkbench=function({THREE:T,viewer,grid,getLanguage,showP
     positionBodyEditor();
   }
   function editRoot(prefix='motion-root-'){
+    if(optimizing)optimizationRun++;
     const values=Array.from({length:6},(_,i)=>Number($(prefix+i).value));if(values.some((v,i)=>!Number.isFinite(v)||$(prefix+i).value===''))throw Error(text('机身姿态需为有效数值','Enter finite base pose values'));
     pause();beforePose();rpy=values.slice(3).map(v=>v*rad);const native=nativePose(values.slice(0,3),core.quaternion(rpy).toArray());viewer.robot.position.copy(native.position);viewer.robot.quaternion.copy(native.quaternion);viewer.world.updateMatrixWorld(true);onPose();syncRoot();message(text('当前姿态已更改，点击记录或更新帧保存','Pose changed; record or update a keyframe to keep it'));
   }
@@ -223,7 +225,7 @@ window.createTrajectoryWorkbench=function({THREE:T,viewer,grid,getLanguage,showP
     }finally{robot.position.copy(position);robot.quaternion.copy(rotation);model.joints.forEach((j,i)=>robot.setJointValue(j.name,values[i]));viewer.world.updateMatrixWorld(true);viewer.redraw();}
     if(!box.isEmpty())fitBounds(box);
   }
-  function toggle(value=!open){const entering=value&&!open;open=value;if(entering){if(project?.reference){detachGround();floorFromReference();}lockGround();}if(!open){pause();hideBodyEditor();groundLock=null;}document.body.classList.toggle('motion-open',open);$('motion-timeline').hidden=!open;$('animate').classList.toggle('active',open);$('animate').setAttribute('aria-pressed',String(open));if(open)showPanel('motion');else if(!$('motion-panel').hidden)showPanel('joints');refreshLayout();drawPath();}
+  function toggle(value=!open){const entering=value&&!open;open=value;if(entering){if(project?.reference){detachGround();floorFromReference();}lockGround();}if(!open){if(optimizing)optimizationRun++;pause();hideBodyEditor();groundLock=null;}document.body.classList.toggle('motion-open',open);$('motion-timeline').hidden=!open;$('animate').classList.toggle('active',open);$('animate').setAttribute('aria-pressed',String(open));if(open)showPanel('motion');else if(!$('motion-panel').hidden)showPanel('joints');refreshLayout();drawPath();}
   function download(name,contents,type){const url=URL.createObjectURL(new Blob([contents],{type})),a=el('a',{href:url,download:name});a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}
   function filename(){return (project.name||'motion').replace(/[^\p{L}\p{N}_.-]/gu,'_');}
   function saveProject(){if(!project)return;download(filename()+'.motion.json',JSON.stringify(project,null,2),'application/json');dirty=false;render();message(text('工程已导出，可再次导入编辑','Project exported; import it to continue editing'));}
@@ -234,6 +236,31 @@ window.createTrajectoryWorkbench=function({THREE:T,viewer,grid,getLanguage,showP
     }catch(e){message(e.message,true);}finally{busy=false;render();}
   }
   function importProject(value){if(!model)throw Error(text('请先加载对应模型','Load the matching model first'));const p=core.validate(value,model);p.keyframes.forEach(f=>f.id='k'+serial++);checkpoint();pause();project=p;selected=p.keyframes[0]?.id||null;time=0;recordTime=core.duration(p)+.5;dirty=false;rpy=[0,0,0];if(p.reference){detachGround();floorFromReference();}if(open)lockGround();restoreProjectPose();render();drawPath();message(text('已导入工程','Project imported'));}
+  async function optimizeMotion(){
+    if(busy||!project)return;pause();const source=clone(project),signature=optimizer.signature(source),robot=viewer.robot,run=++optimizationRun;
+    optimizing=busy=true;render();
+    try{
+      const kinematics=createTrajectoryKinematics(T,robot,source),result=await optimizer.optimize(source,source.optimizerSettings,kinematics,stage=>message(({smoothing:text('优化整段动作的加加速度…','Minimizing whole-motion jerk…'),contacts:text('求解支撑足端约束…','Solving support contact constraints…'),checking:text('检查接触、地面与速度约束…','Checking contacts, ground and rate limits…')})[stage]),()=>run!==optimizationRun);
+      if(run!==optimizationRun||robot!==viewer.robot||signature!==optimizer.signature(project))throw Error(text('工程已更改，已取消本次优化','Project changed; optimization cancelled'));
+      optimizing=false;checkpoint();project=result;dirty=true;time=0;recordTime=core.duration(project)+.5;render();drawPath();seek(0);
+      const r=result.optimization.report;message(text('运动学优化完成 · 时长 ','Kinematic optimization complete · duration ')+r.duration.toFixed(2)+' s'+(r.contactConstraints?text(' · 足端误差 ',' · foot residual ')+(r.contactError*1000).toFixed(2)+' mm':''));
+    }catch(error){if(robot===viewer.robot)message(error.message,true);}
+    finally{optimizing=busy=false;render();}
+  }
+  function renderOptimizer(host){
+    const section=el('section',{'class':'motion-group'}),actions=el('div',{'class':'motion-actions'}),run=button(text('优化轨迹','Optimize trajectory'),optimizeMotion,'motion-optimize'),reset=button(text('使用原插值','Use interpolation'),()=>{checkpoint();delete project.optimization;dirty=true;render();drawPath();seek(time);},'motion-opt-reset');run.disabled=busy||project.keyframes.length<2;reset.disabled=busy||!project.optimization;actions.append(run,reset);
+    if(optimizing)actions.append(button(text('取消','Cancel'),()=>optimizationRun++,'motion-opt-cancel'));
+    section.append(el('h3',{},text('运动学约束优化','Constrained kinematic optimization')),actions);
+    const r=project.optimization?.report;
+    section.append(el('p',{id:'motion-opt-report','class':'muted'},r?text('C² 连续 · 时长 ','C² continuous · duration ')+r.originalDuration.toFixed(2)+' → '+r.duration.toFixed(2)+' s'+(r.contactConstraints?text(' · 足端误差 ',' · foot residual ')+(r.contactError*1000).toFixed(2)+' mm':''):text('整段最小加加速度；限制关节速度/加速度。支撑段锁定所选足端，腾空段解除锁定。','Whole-motion minimum jerk with joint rate limits. Support phases lock selected feet; flight releases them.')));
+    const advanced=el('details'),limits=el('div',{'class':'motion-pose-grid'}),settings=optimizer.settings(project.optimizerSettings);
+    advanced.append(el('summary',{},text('速度与加速度限制','Speed & acceleration limits')));
+    for(const [name,zh,en]of [['jointSpeed','关节速度','Joint speed'],['jointAcceleration','关节加速度','Joint acceleration'],['baseSpeed','机身速度 · m/s','Base speed · m/s'],['baseAcceleration','机身加速度 · m/s²','Base acceleration · m/s²'],['angularSpeed','机身角速度 · rad/s','Base angular speed · rad/s'],['angularAcceleration','机身角加速度 · rad/s²','Base angular accel. · rad/s²']]){
+      const input=number('motion-opt-'+name,settings[name],.1);input.min='.001';input.onchange=guarded(()=>{const next=optimizer.settings({...settings,[name]:Number(input.value)});checkpoint();project.optimizerSettings=next;mark();});limits.append(field(text(zh,en),input));
+    }
+    const retime=el('input',{id:'motion-opt-retime',type:'checkbox'});retime.checked=settings.autoRetime;retime.onchange=()=>{checkpoint();project.optimizerSettings={...settings,autoRetime:retime.checked};mark();};
+    advanced.append(limits,field(text('按限速自动延长时长','Automatically extend timing to respect limits'),retime),el('p',{'class':'muted'},text('关节单位为 rad/s、rad/s²；移动关节为 m/s、m/s²。URDF 速度上限同时生效。','Joints use rad/s and rad/s²; prismatic joints use m/s and m/s². URDF velocity limits also apply.')));section.append(advanced,el('p',{'class':'muted'},text('运动学结果：接触/穿地按采样检查；未求解力矩、摩擦、腾空动力学或自碰撞。','Kinematic result: contacts/ground checked at samples; torques, friction, airborne dynamics and self-collision are not solved.')));host.append(section);
+  }
   function template(){
     if(!model||model.up!=='+Z')throw Error(text('翻转示意需使用 +Z 向上坐标','Flip sketches require +Z up'));
     if(!project.reference&&!project.keyframes.length)throw Error(text('请先设置站姿并固定参考地面','Set a standing pose and fix the ground first'));
@@ -258,7 +285,12 @@ window.createTrajectoryWorkbench=function({THREE:T,viewer,grid,getLanguage,showP
       const timestamp=number('motion-key-time',f.time,.05);timestamp.min='0';timestamp.max='3600';timestamp.disabled=f===project.keyframes[0];timestamp.onchange=guarded(()=>{try{changeTime(timestamp.value);}finally{timestamp.value=String(f.time);}});section.append(field(text('时间 · s','Time · s'),timestamp));
       const label=el('input',{id:'motion-key-label',value:f.label,maxlength:160});label.onchange=()=>{checkpoint();f.label=label.value;mark();};section.append(field(text('名称','Label'),label));
       const method=select('motion-key-mode',modes(),f.interpolation);method.onchange=()=>{checkpoint();f.interpolation=method.value;mark();};section.append(field(text('到下一帧的插值','Interpolation to next key'),method));host.append(section);
+      const phase=select('motion-key-phase',[['free',text('自由运动','Free motion')],['support',text('支撑 · 锁定所选足端','Support · lock selected feet')],['flight',text('腾空 · 不锁足端','Flight · no foot locks')]],f.phase||'free');phase.onchange=()=>{checkpoint();f.phase=phase.value;mark();};section.append(field(text('到下一帧的接触阶段（优化时）','Outgoing contact phase (optimization)'),phase));
+      if(f.phase==='support'){
+        const feet=el('div',{'class':'motion-supports'});for(const name of project.reference?.supports||[]){const input=el('input',{type:'checkbox'});input.checked=(f.supports||project.reference.supports).includes(name);input.onchange=()=>{checkpoint();const names=new Set(f.supports||project.reference.supports);if(input.checked)names.add(name);else names.delete(name);f.supports=[...names];mark();};feet.append(field(name,input));}section.append(feet);
+      }
     }
+    renderOptimizer(host);
     const base=el('section',{'class':'motion-group'});base.append(el('h3',{},text('当前机身姿态','Current base pose')),el('p',{'class':'muted'},project.reference?text('固定地面坐标 · Z 为离地高度 · XYZ 米 / RPY 度','Fixed ground frame · Z is height above ground · XYZ m / RPY deg'):text('URDF 模型坐标 · XYZ 米 / RPY 度','URDF model frame · XYZ m / RPY deg')));
     const fields=el('div',{'class':'motion-pose-grid'});['X','Y','Z','Roll','Pitch','Yaw'].forEach((label,i)=>{const n=number('motion-root-'+i,0,i<3?.01:5);n.onchange=guarded(()=>editRoot());fields.append(field(label,n));});base.append(fields,el('p',{'class':'muted'},text('也可点击三维机身编辑。Pitch 支持 ±360° / ±720°；修改后需记录或更新帧。','Click the 3D body to edit here or beside the model. Pitch accepts ±360° / ±720°; record or update afterward.')));
     const rotation=select('motion-rotation',[['rpy',text('连续 RPY · 保留旋转圈数','Unwrapped RPY · retain turns')],['slerp',text('四元数 SLERP · 最短路径','Quaternion SLERP · shortest path')]],project.rotation);rotation.onchange=()=>{checkpoint();project.rotation=rotation.value;mark();};base.append(rotation);host.append(base);
@@ -281,7 +313,7 @@ window.createTrajectoryWorkbench=function({THREE:T,viewer,grid,getLanguage,showP
     for(const f of project?.keyframes||[]){const b=button('◆',()=>choose(f.id));b.classList.toggle('selected',f.id===selected);b.style.left=(core.duration(project)?f.time/core.duration(project)*100:0)+'%';b.title=f.time.toFixed(3)+' s · '+f.label;b.setAttribute('aria-label',b.title);
       b.onkeydown=guarded(e=>{if(['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();selected=f.id;changeTime(f.time+(e.key==='ArrowRight'?.05:-.05));}});
       b.onpointerdown=e=>{if(f===project.keyframes[0])return;pause();b.setPointerCapture(e.pointerId);const rect=markers.getBoundingClientRect(),end=core.duration(project),index=project.keyframes.indexOf(f);let moved=false;
-        b.onpointermove=ev=>{const lower=project.keyframes[index-1].time+.001,upper=project.keyframes[index+1]?.time-.001||Math.max(end+1,f.time);const next=Math.max(lower,Math.min(upper,Math.round((ev.clientX-rect.left)/rect.width*end*1000)/1000));if(Math.abs(next-f.time)>.0001){if(!moved)checkpoint();f.time=next;selected=f.id;time=next;dirty=true;moved=true;b.style.left=(next/end*100)+'%';}};
+        b.onpointermove=ev=>{const lower=project.keyframes[index-1].time+.001,upper=project.keyframes[index+1]?.time-.001||Math.max(end+1,f.time);const next=Math.max(lower,Math.min(upper,Math.round((ev.clientX-rect.left)/rect.width*end*1000)/1000));if(Math.abs(next-f.time)>.0001){if(!moved)checkpoint();delete project.optimization;f.time=next;selected=f.id;time=next;dirty=true;moved=true;b.style.left=(next/end*100)+'%';}};
         b.onpointerup=b.onpointercancel=()=>{b.onpointermove=null;b.onpointerup=b.onpointercancel=null;if(moved){recordTime=Math.max(recordTime,core.duration(project)+.5);render();drawPath();seek(time);}};
       };markers.append(b);
     }
@@ -290,19 +322,19 @@ window.createTrajectoryWorkbench=function({THREE:T,viewer,grid,getLanguage,showP
     const footer=el('div',{'class':'motion-curve-tools'}),options=[['base:0','Base X · m'],['base:1','Base Y · m'],['base:2','Base Z · m'],['angle:0','Roll · °'],['angle:1','Pitch · °'],['angle:2','Yaw · °'],...(model?.joints||[]).map((j,i)=>['joint:'+i,j.name+(j.type==='prismatic'?' · m':' · rad')])];const channelSelect=select('motion-channel',options,channel);channelSelect.setAttribute('aria-label',text('曲线通道','Curve channel'));channelSelect.onchange=()=>{channel=channelSelect.value;drawCurve();};footer.append(channelSelect,el('span',{id:'motion-curve-range'}),el('span',{'class':'muted'},text('◆ 选择 / 拖动关键帧','◆ Select / drag keyframes')));host.append(footer);for(const [id,label]of [['motion-rewind',text('返回起点','Rewind')],['motion-prev',text('上一采样帧','Previous sample')],['motion-next',text('下一采样帧','Next sample')],['motion-undo',text('撤销','Undo')],['motion-redo',text('重做','Redo')],['motion-fit',text('适应整段轨迹','Fit entire trajectory')],['motion-close',text('关闭时间轴','Close timeline')]]){$(id).setAttribute('aria-label',label);$(id).title=label;}drawCurve();syncTime();
   }
   $('motion-import').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{if(file.size>20*1024*1024)throw Error('Project file exceeds 20 MB');importProject(JSON.parse(await file.text()));}catch(e){message(e.message,true);}};
-  viewer.addEventListener('angle-change',()=>{if(!applying&&open){pause();syncRoot();}});
+  viewer.addEventListener('angle-change',()=>{if(!applying&&open){if(optimizing)optimizationRun++;pause();syncRoot();}});
   window.addEventListener('beforeunload',event=>{if(dirty||[...caches.values()].some(c=>c.dirty)){event.preventDefault();event.returnValue='';}});
   return {toggle,pause,tick,seek,record:guarded(record),importProject,exportReference,saveProject,isBodyLink,pickBody,hideBodyEditor,restoreGround,
     get groundLocked(){return open&&!!groundLock;},
     get isOpen(){return open;},
     get snapshot(){return project?{project:clone(project),time,playing,open,selected,dirty,groundLocked:open&&!!groundLock,bodyEditor:bodyLink?{link:bodyLink.name,visible:!bodyEditor.hidden}:null}:null;},
-    beforeModelChanged(){hideBodyEditor();groundLock=null;},
+    beforeModelChanged(){optimizationRun++;hideBodyEditor();groundLock=null;},
     modelChanged(){pause();if(project)caches.set(cacheKey,{project:clone(project),dirty});
       const robot=viewer.robot;if(!robot)return;const info=new Map(getJointInfo().map(j=>[j.name,j]));const joints=Object.values(robot.joints).filter(j=>['revolute','continuous','prismatic'].includes(j.jointType)&&!j.mimicJoint);
-      model={name:robot.robotName||robot.name,root:robot.name,up:viewer.up,groundPlane:getGround(),unsupported:Object.values(robot.joints).filter(j=>['floating','planar'].includes(j.jointType)).map(j=>j.name),joints:joints.map(j=>({name:j.name,type:j.jointType,lower:j.jointType!=='continuous'&&Number.isFinite(j.limit?.lower)?j.limit.lower:null,upper:j.jointType!=='continuous'&&Number.isFinite(j.limit?.upper)?j.limit.upper:null,velocity:Number.isFinite(info.get(j.name)?.velocity)&&info.get(j.name).velocity>0?info.get(j.name).velocity:null}))};
-      cacheKey=JSON.stringify([model.name,model.root,model.joints]);if(channel.startsWith('joint:')&&Number(channel.split(':')[1])>=joints.length)channel='base:2';const cached=caches.get(cacheKey);caches.delete(cacheKey);project=cached?{...cached.project,model:clone(model)}:newProject();dirty=!!cached?.dirty;undo.length=redo.length=0;selected=project.keyframes[0]?.id||null;time=0;recordTime=project.keyframes.length?core.duration(project)+.5:0;rpy=[0,0,0];if(project.reference){detachGround();floorFromReference();}captured();if(open)lockGround();restoreProjectPose();render();drawPath();
+      model={name:robot.robotName||robot.name,root:robot.name,descriptionHash:getDescriptionHash?.(),up:viewer.up,groundPlane:getGround(),unsupported:Object.values(robot.joints).filter(j=>['floating','planar'].includes(j.jointType)).map(j=>j.name),joints:joints.map(j=>({name:j.name,type:j.jointType,lower:j.jointType!=='continuous'&&Number.isFinite(j.limit?.lower)?j.limit.lower:null,upper:j.jointType!=='continuous'&&Number.isFinite(j.limit?.upper)?j.limit.upper:null,velocity:Number.isFinite(info.get(j.name)?.velocity)&&info.get(j.name).velocity>0?info.get(j.name).velocity:null}))};
+      cacheKey=JSON.stringify([model.name,model.root,model.joints]);if(channel.startsWith('joint:')&&Number(channel.split(':')[1])>=joints.length)channel='base:2';const cached=caches.get(cacheKey);caches.delete(cacheKey);project=cached?{...cached.project,model:clone(model)}:newProject();dirty=!!cached?.dirty;if(project.optimization&&project.optimization.signature!==optimizer.signature(project)){delete project.optimization;dirty=true;}undo.length=redo.length=0;selected=project.keyframes[0]?.id||null;time=0;recordTime=project.keyframes.length?core.duration(project)+.5:0;rpy=[0,0,0];if(project.reference){detachGround();floorFromReference();}captured();if(open)lockGround();restoreProjectPose();render();drawPath();
     },languageChanged(){message('');render();},
-    orientationChanged(){if(model){model.up=viewer.up;if(project.reference)floorFromReference();if(open)lockGround();model.groundPlane=getGround();project.model=clone(model);}},
+    orientationChanged(){optimizationRun++;if(model){model.up=viewer.up;if(project.reference)floorFromReference();if(open)lockGround();model.groundPlane=getGround();project.model=clone(model);}},
     handleShortcut(event){if(!open||$('help-dialog').open)return false;const editing=/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName),inside=$('motion-panel').contains(document.activeElement)||$('motion-timeline').contains(document.activeElement)||bodyEditor.contains(document.activeElement);if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'&&inside){event.preventDefault();saveProject();return true;}if(!editing&&(event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='z'){event.preventDefault();history(event.shiftKey?redo:undo,event.shiftKey?undo:redo);return true;}if(!editing&&event.code==='Space'){event.preventDefault();guarded(play)();return true;}return false;}
   };
 };
