@@ -37,7 +37,7 @@
     joints:['关节','Joints'],
     animate:['轨迹','Motion'],
     motion:['轨迹','Motion'],
-    motionTitle:['关键帧编排','Keyframe motion'],
+    motionTitle:['全身轨迹规划','Whole-body motion planning'],
     structure:['结构','Structure'],
     editor:['编辑','Editor'],
     help:['帮助','Help'],
@@ -281,7 +281,7 @@
     manager.onError=path=>failures.add(path);
     const loader=new URDFLoader(manager);
     loader.parseCollision=true;
-    loader.workingPath=context?.base || new URL('.',location.href).href;
+    loader.workingPath=context?.workingPath ?? (context?.base || new URL('.',location.href).href);
     loader.packages=pkg=>context?.assets ? new URL(`/__local__/${pkg}`,location.href).href : new URL(`urdf/${pkg}`,location.href).href;
     loader.loadMeshCb=loadMesh;
     let robot;
@@ -1728,6 +1728,7 @@
   });
   statics=createStaticsWorkbench({THREE,viewer,grid,refreshScene:()=>{queueLinkMeasurementUpdate();queueJointAngleUpdate();fitView();},getModel:()=>({xml:state.xml,version:state.version}),getLanguage:()=>lang,openRight:()=>setPanel('editor',true),refreshAxes:refreshJointAngleAxis,project:projectMeasurementPoint});
   motion=createTrajectoryWorkbench({THREE,viewer,grid,projectPoint:projectMeasurementPoint,fitBounds:fitView,getJointInfo:()=>state.orderedJoints.map(n=>({name:n.name,velocity:Number(direct(n.element,'limit')?.getAttribute('velocity'))})),getLanguage:()=>lang,showPanel:name=>setPanel(name,true),refreshLayout:refreshWorkspace,
+    loadPlanningModel:async()=>{if(hasEdits())throw Error(t('unsaved'));const url=new URL('/api/planner/model',location.href),response=await fetch(url,{cache:'no-store'});if(!response.ok)throw Error('Planner model unavailable');const text=await response.text();return loadText(text,{name:'go2-planner.urdf',path:'planner/go2-planner.urdf',workingPath:'',base:new URL('.',url).href,sourceFile:sourceFiles.fromURL(url,text)});},
     supportPlane:normal=>statics.motionSupportPlane(normal),detachGround:()=>statics.prepareMotion(),
     getDescriptionHash:()=>{let hash=2166136261;for(let i=0;i<state.source.length;i++)hash=Math.imul(hash^state.source.charCodeAt(i),16777619);return (hash>>>0).toString(16);},
     beforePose:()=>{clearSurfaceMeasurement();statics.prepareMotion({preserveGround:true});motion?.restoreGround();},

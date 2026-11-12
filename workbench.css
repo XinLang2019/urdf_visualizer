@@ -1756,3 +1756,15 @@ body.motion-open .view-help {display:none;}
 .motion-group details summary {cursor:pointer;font-size:11px;color:var(--text);margin:8px 0;}
 .motion-group details .motion-pose-grid {grid-template-columns:repeat(2,minmax(0,1fr));}
 #motion-optimize {background:var(--blue);color:var(--on-accent);}
+
+/* Local whole-body planning controls share the compact motion workspace. */
+.motion-workspace-modes {position:sticky;top:-1px;z-index:1;padding:4px 0 8px;background:var(--panel);}
+.motion-workspace-modes .active,#planner-start {background:var(--blue);color:var(--on-accent);}
+.planner-settings {border:0;padding:0;margin:10px 0;min-width:0;}
+.planner-settings h3 {font-size:12px;margin:14px 0 8px;}
+.planner-settings details {border-top:1px solid var(--line);padding-top:8px;margin-top:10px;}
+.planner-settings summary {font-size:11px;cursor:pointer;margin-bottom:8px;}
+.planner-settings .motion-pose-grid {grid-template-columns:repeat(2,minmax(0,1fr));}
+#planner-progress {width:100%;height:7px;accent-color:var(--blue);margin-top:10px;}
+#planner-progress-detail,#planner-status,.planner-result {font-size:11px;line-height:1.6;overflow-wrap:anywhere;}
+#planner-status.error {color:var(--danger);}

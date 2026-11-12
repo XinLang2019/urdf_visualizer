@@ -196,7 +196,8 @@ def main():
     output = Path(tempfile.mkdtemp(prefix='urdf-viewer-checks-'))
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     with tempfile.TemporaryDirectory(prefix='urdf-viewer-chrome-') as profile, open(output / 'browser.log', 'w') as log:
-        server = subprocess.Popen([sys.executable, '-m', 'http.server', str(server_port), '--bind', '127.0.0.1'], cwd=ROOT, stdout=log, stderr=log)
+        server_command=[sys.executable,str(ROOT/'planner_server.py'),'--port',str(server_port)] if os.environ.get('URDF_TEST_PLANNER')=='1' else [sys.executable,'-m','http.server',str(server_port),'--bind','127.0.0.1']
+        server = subprocess.Popen(server_command, cwd=ROOT, stdout=log, stderr=log)
         chrome = subprocess.Popen([BROWSER, '--headless=new', '--no-sandbox', '--disable-dev-shm-usage', '--disable-background-networking', '--enable-unsafe-swiftshader', '--use-angle=swiftshader', f'--remote-debugging-port={debug_port}', f'--remote-allow-origins=http://localhost:{debug_port}', '--user-data-dir=' + profile, 'about:blank'], stdout=log, stderr=log)
         client = None
         try:

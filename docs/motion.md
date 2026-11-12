@@ -6,7 +6,7 @@
 
 ## 中文
 
-点击顶部“轨迹”或左侧“轨迹”标签。编辑器记录**独立关节 + 机身六自由度姿态**，不修改 URDF 文件。
+顶部“轨迹”默认进入[全身规划](planning.md)，本页描述其中“手动关键帧”标签。编辑器记录**独立关节 + 机身六自由度姿态**，不修改 URDF 文件。
 
 1. 点击“默认站姿并接地”：`hip=0、thigh=0.8、calf=−1.5 rad`（遵守 URDF 限位）。人形或其他命名模型可手动调姿，再点“按当前站姿固定地面”。然后记录首帧 `0 s`。
 2. 在关节标签中拖动连杆、滑块或输入关节值；在轨迹标签中设置机身 XYZ、Roll / Pitch / Yaw，也可单击三维机身，在旁边的浮动编辑框中直接修改，并记录或更新关键帧。
@@ -60,7 +60,7 @@
 
 ## English
 
-Open **Motion** from the toolbar or left workspace. Each keyframe stores independent joint positions and the base's six-degree-of-freedom pose without changing the URDF.
+**Motion** opens the [whole-body planner](planning.md#english) by default. Select **Manual keyframes** for this guide. Each keyframe stores independent joint positions and the base's six-degree-of-freedom pose without changing the URDF.
 
 1. Choose **Default stand & ground** (`hip=0, thigh=0.8, calf=−1.5 rad`, clamped to URDF limits), or pose a humanoid / other model manually and choose **Set ground from stance**. Record the first key at `0 s`.
 2. Adjust links or joint sliders in Joints; edit base XYZ and Roll / Pitch / Yaw in Motion, or click the 3D chassis to edit them beside the model and record or update a key.

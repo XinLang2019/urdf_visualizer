@@ -4,7 +4,8 @@ window.createTrajectoryCore=function(T){
   const modes=['linear','smoothstep','quintic','cubic'],rotations=['rpy','slerp'];
   const finite=Number.isFinite,clone=x=>JSON.parse(JSON.stringify(x));
   const quaternion=rpy=>new T.Quaternion().setFromEuler(new T.Euler(...rpy,'ZYX'));
-  const duration=p=>p?.keyframes.at(-1)?.time||0;
+  const duration=p=>p?.plan?.frames.at(-1)?.time||p?.keyframes.at(-1)?.time||0;
+  let planMath;const planner=()=>planMath||(planMath=createWholeBodyTrajectoryCore(T));
   let optimizationMath;
   const optimizer=()=>optimizationMath||(optimizationMath=createTrajectoryOptimizer(T,{clone,duration}));
   function validate(p,model){
@@ -33,6 +34,7 @@ window.createTrajectoryCore=function(T){
     const result={...clone(p),model:clone(model),loop:!!p.loop};
     if(result.optimizerSettings)optimizer().settings(result.optimizerSettings);
     if(result.optimization)optimizer().validate(result);
+    if(result.plan)planner().validate(result.plan,model);
     return result;
   }
   function ease(mode,u){
@@ -60,6 +62,7 @@ window.createTrajectoryCore=function(T){
       ((12*u-6)*a+(6*u-4)*m+(-12*u+6)*b+(6*u-2)*n)/(h*h)];
   }
   function evaluate(p,time){
+    if(p.plan){if(!finite(time))throw Error('Invalid sample time');return planner().evaluate(p.plan,time);}
     const fs=p.keyframes;if(!fs.length)throw Error('No keyframes');
     const end=duration(p),t=Math.max(0,Math.min(end,time));
     if(!finite(time))throw Error('Invalid sample time');
@@ -97,15 +100,16 @@ window.createTrajectoryCore=function(T){
     if(n>100000||n*(30+p.model.joints.length*3)>5000000)throw Error('Too many samples; reduce duration or sample rate');return n;
   }
   async function sample(p,fps=p.fps){
-    if(!p.keyframes.length)throw Error('No keyframes');
-    const n=count(p,fps),frames=[],end=duration(p),peak=p.model.joints.map(()=>0);let previous=null;
+    if(!p.keyframes.length&&!p.plan)throw Error('No keyframes');
+    if(p.plan)fps=1/p.plan.settings.dt;
+    const n=p.plan?p.plan.frames.length:count(p,fps),frames=[],end=duration(p),peak=p.model.joints.map(()=>0);let previous=null;
     for(let i=0;i<n;i++){
-      const f=evaluate(p,Math.min(i/fps,end)),q=f.base_quaternion;
+      const f=p.plan?clone(p.plan.frames[i]):evaluate(p,Math.min(i/fps,end)),q=f.base_quaternion;
       if(previous&&q.reduce((s,x,j)=>s+x*previous[j],0)<0)f.base_quaternion=q.map(x=>-x);
       previous=f.base_quaternion;frames.push(f);f.joint_velocities.forEach((v,j)=>peak[j]=Math.max(peak[j],Math.abs(v)));
       if(i%250===249)await new Promise(resolve=>setTimeout(resolve,0));
     }
-    return {schema:'urdf-viewer.reference.v1',name:p.name,fps,duration:end,metadata:{frame:p.reference?'fixed ground (Z up, ground at Z = 0)':'URDF root parent (before viewer up-axis rotation)',reference_transform:p.reference||null,position_unit:'m',angle_unit:'rad',quaternion_order:'xyzw',rpy_convention:'Rz(yaw) Ry(pitch) Rx(roll), unwrapped input',velocity_frame:p.reference?'fixed ground; angular velocity is spatial, not RPY rates':'root parent; angular velocity is spatial, not RPY rates',independent_joints:p.model.joints.map(j=>j.name),joint_units:p.model.joints.map(j=>j.type==='prismatic'?'m':'rad'),mimic:'Excluded; reproduce from URDF constraints',display_up_axis:p.model.up,ground_plane:p.reference?{normal:[0,0,1],offset:0}:p.model.groundPlane,urdf_ground_plane:p.model.groundPlane,kinematic_only:true,optimization:p.optimization?.report||null,derivatives:p.optimization?'Analytic C2 quintic splines; endpoint is exact. Jerk can jump at knots.':'Analytic, piecewise; linear velocities and cubic accelerations may jump at knots. Last row is the exact endpoint (possibly a shorter interval).',rotation:p.rotation,loop:p.loop,loop_seam_validated:false},diagnostics:{sampled_peak_joint_speeds:peak,velocity_limit_exceeded:p.model.joints.filter((j,i)=>finite(j.velocity)&&peak[i]>j.velocity+1e-8).map(j=>j.name)},frames};
+    return {schema:'urdf-viewer.reference.v1',name:p.name,fps,duration:end,metadata:{frame:p.reference?'fixed ground (Z up, ground at Z = 0)':'URDF root parent (before viewer up-axis rotation)',reference_transform:p.reference||null,position_unit:'m',angle_unit:'rad',quaternion_order:'xyzw',rpy_convention:'Rz(yaw) Ry(pitch) Rx(roll), unwrapped input',velocity_frame:p.reference?'fixed ground; angular velocity is spatial, not RPY rates':'root parent; angular velocity is spatial, not RPY rates',independent_joints:p.model.joints.map(j=>j.name),joint_units:p.model.joints.map(j=>j.type==='prismatic'?'m':'rad'),mimic:'Excluded; reproduce from URDF constraints',display_up_axis:p.model.up,ground_plane:p.reference?{normal:[0,0,1],offset:0}:p.model.groundPlane,urdf_ground_plane:p.model.groundPlane,kinematic_only:!p.plan,dynamics:p.plan?.report||null,optimization:p.optimization?.report||null,derivatives:p.plan?'Solver node derivatives; base rates expressed in the fixed ground frame. Inter-node display interpolation is not dynamically certified.':p.optimization?'Analytic C2 quintic splines; endpoint is exact. Jerk can jump at knots.':'Analytic, piecewise; linear velocities and cubic accelerations may jump at knots. Last row is the exact endpoint (possibly a shorter interval).',rotation:p.rotation,loop:p.loop,loop_seam_validated:false},diagnostics:{sampled_peak_joint_speeds:peak,velocity_limit_exceeded:p.model.joints.filter((j,i)=>finite(j.velocity)&&peak[i]>j.velocity+1e-8).map(j=>j.name)},frames};
   }
   function csv(data){
     const jointNames=data.metadata.independent_joints,fields=[['base_position',['x','y','z']],['base_rpy',['roll','pitch','yaw']],['base_quaternion',['x','y','z','w']],['base_linear_velocity',['x','y','z']],['base_angular_velocity',['x','y','z']],['base_linear_acceleration',['x','y','z']],['base_angular_acceleration',['x','y','z']],['joint_positions',jointNames],['joint_velocities',jointNames],['joint_accelerations',jointNames]];

@@ -11,12 +11,14 @@ A browser-based URDF workbench for robot visualization, joint control, 3D measur
 Run from the project directory:
 
 ```bash
-python3 -m http.server 8080 --bind 127.0.0.1
+python3 planner_server.py --port 8080
 ```
 
 Open [localhost:8080](http://localhost:8080). Choose a bundled example or load a complete robot folder containing its URDF, meshes, and textures. Serve the page over HTTP.
 
 Chrome / Edge is recommended. Saving back to a source file requires localhost or HTTPS and file write permission. For bundled examples, select the matching original file on disk when saving for the first time.
+
+Whole-body planning requires the external `go2_flip_TO` project and a Pinocchio / cyipopt Python environment. Set `--solver-root` and `--solver-python` as needed; see [setup and workflow](docs/planning.md#english). Ordinary static hosting still supports the viewer and manual editor.
 
 ## Features
 
@@ -25,12 +27,14 @@ Chrome / Edge is recommended. Saving back to a source file requires localhost or
 - **Visual helpers**: visual and collision geometry, centers of mass, equivalent inertia boxes, link frames, and joint axes. Light / dark themes and Chinese / English UI.
 - **3D measurement**: point-to-point or link-origin distance with XYZ components, with up to 5 geometric snap candidates.
 - **Edit and save**: XML highlighting, validation, model reload, and saving edits directly to the source file.
-- **Keyframe motion**: set a default stand, fix the foot-contact ground, author ground-relative base and joint poses, choose interpolation or constrained kinematic optimization with foot locks and rate-based retiming, retain full flip turns, and export JSON / CSV references. [Workflow and data format](docs/motion.md#english).
+- **Whole-body motion planning**: Go2 dynamics optimization with contact phases, friction, motor limits, landing and flight-pose constraints; live progress, direct playback, torques and contact-force export. [Workflow](docs/planning.md#english). The [manual keyframe editor](docs/motion.md#english) remains available.
 - **Statics**: live joint torques, contact reactions, and moment arms. Configure slope and friction, fit wheels / feet to the ground, and solve body attitude.
 
 | 3D distance and XYZ components | Slope contacts and joint torques |
 | --- | --- |
 | ![Distance measurement between two link origins](docs/images/measurement.png) | ![Go2 fitted to a slope with static load parameters](docs/images/slope-statics.png) |
+
+![Go2 whole-body backflip planning: constraints, progress and playback](docs/images/whole-body-planner.jpg)
 
 ## Controls
 

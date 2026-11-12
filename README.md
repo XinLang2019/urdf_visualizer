@@ -11,8 +11,10 @@
 在项目目录运行：
 
 ```bash
-python3 -m http.server 8080 --bind 127.0.0.1
+python3 planner_server.py --port 8080
 ```
+
+全身规划需配置相邻的 `go2_flip_TO` 项目和包含 Pinocchio / cyipopt 的 Python 环境；可用 `--solver-root`、`--solver-python` 指定路径。[配置与使用](docs/planning.md)。仅浏览模型可继续使用 `python3 -m http.server 8080`。
 
 访问 [localhost:8080](http://localhost:8080)，选择内置示例，或加载包含 URDF、网格与纹理的完整机器人文件夹。请通过 HTTP 打开页面。
 
@@ -25,12 +27,14 @@ python3 -m http.server 8080 --bind 127.0.0.1
 - **辅助显示**：视觉、碰撞、质心、等效惯量长方体、坐标轴与关节轴；支持明暗主题和中英文界面。
 - **三维测量**：两点或两连杆原点之间的距离及 XYZ 分量，提供最多 5 个几何吸附候选点。
 - **编辑与保存**：XML 高亮、校验、重新加载，修改后直接保存到源文件。
-- **关键帧轨迹**：一键默认站姿并固定足端地面，以离地高度编排机身与关节，四种插值与约束运动学优化（足端锁定、限速延时）、连续角度空翻及 JSON / CSV 导出。[使用与数据格式](docs/motion.md)。
+- **全身轨迹规划**：Go2 全身动力学优化，编辑接触时序、摩擦、电机限值、落地与腾空姿态约束；实时进度、自动播放和力矩 / 接触力导出。[使用说明](docs/planning.md)。旧的[手动关键帧](docs/motion.md)仍可使用。
 - **静力学分析**：实时关节力矩、支撑反力和力臂；设置坡度与摩擦系数，一键贴合轮子 / 足端并计算机身姿态。
 
 | 三维距离与 XYZ 分量 | 斜坡接触与关节力矩 |
 | --- | --- |
 | ![两连杆原点的三维测量示例](docs/images/measurement.png) | ![Go2 四足贴合斜坡与静力学参数](docs/images/slope-statics.png) |
+
+![Go2 全身后空翻规划：约束、进度与回放](docs/images/whole-body-planner.jpg)
 
 ## 常用操作
 
