@@ -46,9 +46,10 @@
     formatConvert:['格式转换','Convert format'],
     convertDownload:['转换并下载','Convert & download'],
     conversionDetails:['转换说明','Conversion details'],
-    formatServiceHint:['MJCF / USD 加载和格式转换需要格式服务。','MJCF / USD loading and conversion require the format service.'],
-    formatSetup:['配置与支持范围','Setup & support'],
-    formatsServiceRequired:['请使用 python3 model_server.py 启动工作台，并安装 requirements-formats.txt 中的依赖。普通静态服务仅支持 URDF。','Start the workbench with python3 model_server.py and install requirements-formats.txt. Ordinary static hosting supports URDF only.'],
+    formatServiceHint:['浏览器本地处理 URDF / MJCF / 文本 USDA，无需 Python，不上传模型。','URDF / MJCF / text USDA run locally in your browser. No Python or model uploads.'],
+    nativeFormatServiceHint:['原生模式：由本机格式服务解析，支持二进制 USD / USDZ。','Native mode: your local format service handles binary USD / USDZ.'],
+    formatSetup:['使用与支持范围','Usage & support'],
+    formatsServiceRequired:['当前选择了原生服务模式：请运行 python3 model_server.py 并安装 requirements-formats.txt，或删除地址中的 ?formats=native 使用纯浏览器模式。','Native mode selected: run python3 model_server.py with requirements-formats.txt installed, or remove ?formats=native to use browser mode.'],
     formatsTimeout:['模型转换超时，请简化模型或拆分资源后重试','Model conversion timed out. Simplify or split the model and retry.'],
     unsupportedModel:['请选择 URDF <robot>、MJCF <mujoco> 或 USD 模型','Choose a URDF <robot>, MJCF <mujoco>, or USD model'],
     loadCompleteFolder:['请加载包含模型及其网格、引用文件的完整文件夹','Load the complete model folder, including meshes and referenced files'],
@@ -152,11 +153,13 @@
     saveHint:['已保存到源文件','Saved to the source file'],
     newModel:['模型','Model']
   };
+  const nativeFormats=new URLSearchParams(location.search).get('formats')==='native';
   let lang = 'zh';
-  const t = key => strings[key]?.[lang === 'zh' ? 0 : 1] || key;
+  const t = key => strings[key==='formatServiceHint'&&nativeFormats?'nativeFormatServiceHint':key]?.[lang === 'zh' ? 0 : 1] || key;
   const state = { display:{visual:true,collision:false,inertia:false,com:false,axes:false,jointAxes:false,shadow:true,lighting:true,grid:true}, radians:true, limits:true, source:'', baseline:'', saving:false, context:null, version:0, selected:null, rows:new Map(), helpers:[], mobile:'files', activeTab:'files', sidebarCollapsed:false, editorOpen:innerWidth>1000 };
   const sourceFiles=new URDFSourceFiles(t);
   const modelFormats=new URDFModelFormats(t);
+  if(nativeFormats)$('conversion-target').querySelector('[value="usd"]').textContent='USD (.usd)';
   let conversionBusy=false;
   // Keep initialization failures visible even when WebGL is unavailable.
   let THREE, viewer, grid;

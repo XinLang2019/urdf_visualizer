@@ -5,10 +5,34 @@ import json
 import os
 from pathlib import Path
 import sys
+import tempfile
 import zipfile
 import browser_smoke as smoke
-from test_model_formats import URDF
+from test_model_formats import URDF, physical
 from model_interaction import rendered_frame
+
+BROWSER_FORMATS=os.environ.get('URDF_TEST_BROWSER_FORMATS')=='1'
+
+def verify_browser_package(package):
+    """Independent native SDKs check browser-generated files and physical frames."""
+    import model_formats as formats
+    import numpy as np
+    with tempfile.TemporaryDirectory(prefix='browser-format-physics-') as folder:
+        root=Path(folder);(root/'original.urdf').write_text(URDF)
+        original=formats.read_model(root,root/'original.urdf')[0]
+        for name,value in package.items():
+            path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(value)
+        entry=next(root/name for name in package if name in ['model.urdf','model.xml','model.usda'])
+        actual=formats.read_model(root,entry)[0]
+        if entry.suffix=='.xml':
+            import mujoco
+            compiled=mujoco.MjModel.from_xml_path(str(entry))
+            assert abs(compiled.body_mass.sum()-3)<1e-6
+        for angle in [-.7,0,.8]:
+            a,b=physical(original,{'hinge':angle}),physical(actual,{'hinge':angle})
+            assert set(a)==set(b)
+            for name in a:
+                for k in range(4):np.testing.assert_allclose(a[name][k],b[name][k],atol=5e-6)
 
 
 def import_files(client,files,expected):
@@ -32,7 +56,8 @@ def convert(client,target):
         assert report['targetFormat']==target
         result={name:archive.read(name) for name in archive.namelist() if name not in ['README.txt','conversion-report.json']}
         assert report['entry'] in result
-        if target=='usd':assert result[report['entry']][:8]==b'PXR-USDC'
+        if target=='usd':assert result[report['entry']].startswith(b'#usda') if BROWSER_FORMATS else result[report['entry']][:8]==b'PXR-USDC'
+        if BROWSER_FORMATS:assert report['engine']=='browser'
     client.until('!document.getElementById("convert-model").disabled')
     return result,report
 
@@ -40,7 +65,7 @@ def convert(client,target):
 def run(client,url,output):
     client.call('Runtime.enable');client.call('Page.enable');client.call('Network.enable')
     client.call('Emulation.setDeviceMetricsOverride',{'width':1897,'height':942,'deviceScaleFactor':1,'mobile':False})
-    client.call('Page.navigate',{'url':url});client.until('!!window.urdfWorkbench')
+    client.call('Page.navigate',{'url':url if BROWSER_FORMATS else url+'?formats=native'});client.until('!!window.urdfWorkbench')
     client.js('''window.formatDownloads=[];window.formatClick=HTMLAnchorElement.prototype.click;HTMLAnchorElement.prototype.click=function(){if(this.download){const name=this.download;fetch(this.href).then(r=>r.blob()).then(blob=>new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.readAsDataURL(blob);})).then(data=>formatDownloads.push({name,data}));}else formatClick.call(this)}''')
     import_files(client,{'original.urdf':URDF},'format_fixture')
     smoke.check(client,'document.getElementById("model-format-info").hidden','ordinary URDF source remains the editable original')
@@ -49,6 +74,7 @@ def run(client,url,output):
         package,report=convert(client,target);native[target]=package
         smoke.check(client,'!document.getElementById("conversion-status").classList.contains("error")','URDF → '+target.upper()+' produces a resource package')
         assert report['links']==2 and report['joints']==1
+        if BROWSER_FORMATS:verify_browser_package(package)
     for source,package in native.items():
         import_files(client,package,'format_fixture')
         smoke.check(client,'!document.getElementById("model-format-info").hidden && document.getElementById("filename").value.endsWith(".viewer.urdf") && document.getElementById("save-state").textContent.includes("未保存")','native '+source.upper()+' exposes an explicit URDF working copy instead of overwriting the source')
@@ -58,6 +84,7 @@ def run(client,url,output):
         client.js('document.getElementById("tab-files").click()')
         for target in ['urdf','usd' if source=='mjcf' else 'mjcf']:
             converted,report=convert(client,target)
+            if BROWSER_FORMATS:verify_browser_package(converted)
             smoke.check(client,'!document.getElementById("conversion-status").classList.contains("error")',source.upper()+' → '+target.upper()+' produces a valid native file and conversion report')
             # Ensure every resource referenced by exported URDF is included.
             if target=='urdf':
@@ -86,6 +113,9 @@ def run(client,url,output):
         client.js('document.getElementById("example-select").value='+json.dumps(example)+';document.getElementById("load-example").click()')
         client.until('urdfWorkbench.viewer.robot?.robotName==='+json.dumps(expected)+' && !urdfWorkbench.loading',90)
         smoke.check(client,'!document.querySelector("#status.error")','native example loads: '+example)
+    if BROWSER_FORMATS:
+        from browser_format_cases import check_browser_cases
+        check_browser_cases(client)
     # Real bundled Go2: DAE coordinates, native centering and USD geometry.
     client.js("""window.formatBounds=()=>{const T=parcelRequire('../node_modules/three/build/three.module.js'),out={};urdfWorkbench.viewer.world.updateWorldMatrix(true,true);for(const [name,link]of Object.entries(urdfWorkbench.viewer.robot.links)){const box=new T.Box3();for(const child of link.children)if(child.isURDFVisual)box.expandByObject(child,true);if(!box.isEmpty())out[name]=[...box.min.toArray(),...box.max.toArray()];}return out}""")
     for target in ['mjcf','usd']:
@@ -101,10 +131,14 @@ def run(client,url,output):
         client.call('Emulation.setDeviceMetricsOverride',{'width':width,'height':height,'deviceScaleFactor':1,'mobile':False});rendered_frame(client)
         smoke.check(client,'document.documentElement.scrollWidth<=innerWidth && document.getElementById("files-panel").scrollWidth<=document.getElementById("files-panel").clientWidth','format tools fit the '+str(width)+'px viewport')
     client.screenshot(str(output/'format-conversion.png'))
+    if BROWSER_FORMATS:
+        requests=[e['params']['request']['url'] for e in client.events if e.get('method')=='Network.requestWillBeSent']
+        assert not any('/api/formats/' in u for u in requests),requests
+        print('PASS static hosting uses no Python API, uploads or external conversion services',flush=True)
     client.js('HTMLAnchorElement.prototype.click=formatClick')
     exceptions=[e for e in client.events if e.get('method')=='Runtime.exceptionThrown']
     assert not exceptions,exceptions
-    print('PASS native multipart import, all six conversions, binary USD, packaged meshes, joint controls, safe working-copy saves and errors',flush=True)
+    print('PASS '+('static browser import, all six conversions, text USDA' if BROWSER_FORMATS else 'native multipart import, all six conversions, binary USD')+', packaged meshes, joint controls, safe working-copy saves and errors',flush=True)
 
 if __name__=='__main__':
-    os.environ['URDF_TEST_FORMATS']='1';smoke.run=run;smoke.main()
+    os.environ['URDF_TEST_FORMATS']='0' if BROWSER_FORMATS else '1';smoke.run=run;smoke.main()

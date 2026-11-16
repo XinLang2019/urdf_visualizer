@@ -18,12 +18,12 @@ Open [localhost:8080](http://localhost:8080). Choose a bundled example or load a
 
 Chrome / Edge is recommended. Saving back to a source file requires localhost or HTTPS and file write permission. For bundled examples, select the matching original file on disk when saving for the first time.
 
-For MJCF / USD loading and conversion, run `python3 model_server.py` after installing the native dependencies. See [format service setup](docs/formats.md#english).
+URDF / MJCF / text USDA loading and conversion work directly on GitHub Pages and ordinary static hosting, entirely in your browser. No Python installation or model uploads. Binary USD is available through the optional local service. See [format support](docs/formats.md#english).
 
 ## Features
 
 - **Models and structure**: URDF, MJCF and USD file / folder import, drag and drop, and a structure graph; bundled robots and native-format examples.
-- **Format conversion**: URDF ↔ MJCF ↔ USD, including binary USD. Downloads include meshes and a difference report. [Workflow](docs/formats.md#english).
+- **Format conversion**: URDF ↔ MJCF ↔ USD, with text `.usda` export online. Downloads include meshes and a difference report. [Workflow](docs/formats.md#english).
 - **Joint control**: pose robots by dragging links or sliders; joint limits and degrees / radians. Double-click a link to locate its joint and code.
 - **Visual helpers**: visual and collision geometry, centers of mass, equivalent inertia boxes, link frames, and joint axes. Light / dark themes and Chinese / English UI.
 - **3D measurement**: point-to-point or link-origin distance with XYZ components, with up to 5 geometric snap candidates.

@@ -18,12 +18,12 @@ python3 -m http.server 8080
 
 推荐 Chrome / Edge。保存源文件需要在 localhost 或 HTTPS 下授权文件写入；内置示例首次保存时需选择磁盘上对应的原文件。
 
-MJCF / USD 加载及三种格式互转请使用 `python3 model_server.py`，首次需安装原生依赖，见[格式服务配置](docs/formats.md)。
+GitHub Pages 与普通静态服务可直接加载 URDF / MJCF / 文本 USDA 并互转；全部在浏览器本地处理，无需安装 Python，不上传模型。二进制 USD 为可选本地服务功能，见[格式支持范围](docs/formats.md)。
 
 ## 主要功能
 
 - **模型与结构**：URDF、MJCF、USD 文件 / 文件夹导入、拖拽加载、结构拓扑；内置机器人及 MJCF / USD 示例。
-- **格式转换**：URDF ↔ MJCF ↔ USD，打包网格下载，附转换差异说明；二进制 USD 也可加载。[使用方法](docs/formats.md)。
+- **格式转换**：URDF ↔ MJCF ↔ USD，打包网格下载，附转换差异说明；在线版 USD 导出为文本 `.usda`。[使用方法](docs/formats.md)。
 - **关节控制**：拖动连杆或滑块调姿，支持限位和角度 / 弧度切换；双击连杆定位关节和代码。
 - **辅助显示**：视觉、碰撞、质心、等效惯量长方体、坐标轴与关节轴；支持明暗主题和中英文界面。
 - **三维测量**：两点或两连杆原点之间的距离及 XYZ 分量，提供最多 5 个几何吸附候选点。

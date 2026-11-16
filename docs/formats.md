@@ -2,11 +2,39 @@
 
 **中文** · [English](#english)
 
-支持加载 URDF、MJCF（`.xml` / `.mjcf`）、USD（`.usd` / `.usda` / `.usdc` / `.usdz`），以及 **URDF ↔ MJCF ↔ USD** 六个方向的转换。MJCF 使用 MuJoCo 编译器解析，USD 使用 OpenUSD SDK；不会把二进制 USD 当成文本 XML。
+GitHub Pages 与普通静态服务可直接加载 **URDF、MJCF、文本 USDA**，并支持三种格式六个方向的转换。模型解析、转换和 ZIP 打包均在浏览器本地完成，**无需 Python，不上传模型**。
 
-## 启动
+## 使用
 
-格式服务与网页使用同一个地址。首次安装依赖，后续只运行最后一行：
+1. 选择内置模型，或加载完整模型文件夹，包括 MJCF include、网格等资源。
+2. MJCF / USDA 自动生成 **URDF 工作副本**，继续使用关节控制、测量、编辑、静力学等工具。原始文件不覆盖。
+3. 文件栏选择 URDF、MJCF 或 USD，再点击“转换并下载”。在线版的 USD 输出为标准文本 **`model.usda`**。
+4. 解压 ZIP 后，保持模型文件与 `meshes/` 相邻；`conversion-report.json` 记录单位、转换差异与限制。
+
+转换使用当前编辑器的模型代码；滑块中的当前关节角度不作为模型零位写入。MJCF / USDA 的“导出 URDF 包”会一起打包工作副本与网格；原生 URDF 的“保存”仍覆盖已授权源文件。
+
+在线直接打开 GitHub Pages。开发时可以运行任意静态服务，例如 `python3 -m http.server 8080`，然后打开 [localhost:8080](http://localhost:8080)。这里的 Python 只是开发用静态服务器，模型处理完全在浏览器进行。直接用 `file://` 打开可导入本地文件，但内置示例仍需要 HTTP。
+
+![模型加载、关节控制与格式转换](images/format-conversion.png)
+
+## 浏览器支持范围
+
+| 数据 | 支持与限制 |
+| --- | --- |
+| 模型 | URDF；MJCF `.xml` / `.mjcf`；以 `#usda` 开头的文本 `.usda` / `.usd`。二进制 `.usdc` / `.usd` 与 USDZ 不在浏览器版范围内。 |
+| 关节 | 单父树形结构；固定、转动、连续转动、移动和浮动根。MJCF 每个 body 暂支持一个关节；球铰、多关节 body、闭环、USD D6 需先转换或展开。 |
+| MJCF | include、default / class / childclass；局部坐标；角度单位与旋转序列；关节位置、ref、限位；显式质量与完整惯量。基础几何可按 mass / density 计算惯量，网格无显式惯量时保留未知值。 |
+| USDA | 单个已展开场景；常用 xformOp 及顺序；Y / Z 向上与单位；UsdPhysics 刚体、两侧关节帧、质量、质心、主惯量轴。关节两侧须处于一致的零位。引用层、payload、变体、over / class、动画需先 flatten / bake。 |
+| 几何 | 盒、球、圆柱；MJCF 胶囊、椭球；USD 基础几何；三角面 / 四边面网格。浏览器网格转换支持 STL、OBJ、DAE；曲面按三角网格导出，复杂面与带孔面需先三角化。 |
+| 惯量 | URDF 惯量坐标和 USD 主惯量轴会转换。未知参数不补造；MJCF 导出要求运动刚体具有正质量和物理有效的惯量。 |
+| 材质 | 常量 RGBA；不迁移贴图、复杂着色器或网格面材质。DAE 按现有查看器的坐标约定解析。 |
+| 扩展 | 不重建控制器、传感器、肌腱、仿真器调参或求解器约束。URDF mimic 写为 MJCF equality 或 USD 元数据。 |
+
+转换文件并不保证仿真器之间动力学等价。浏览器版不调用 MuJoCo 编译器或 OpenUSD SDK；差异说明会随模型包导出。无法表示的输入明确报错，并保留先前已加载模型。单次输入上限 384 MiB / 1500 文件；大网格转换会占用浏览器内存与计算时间。
+
+## 可选原生模式：二进制 USD
+
+如果需要二进制 USD / USDZ、USD 引用层或更完整的 MJCF 编译解析，可继续使用本地原生服务。这不是在线版的前置要求。
 
 ```bash
 python3 -m venv .venv-formats
@@ -14,63 +42,38 @@ python3 -m venv .venv-formats
 python3 model_server.py --port 8080
 ```
 
-需要 Python 3.10+。默认自动使用 `.venv-formats/bin/python` 处理模型，也可通过 `--python /path/to/python` 指定环境。打开 [localhost:8080](http://localhost:8080)。原有的 `python3 -m http.server 8080` 仍可浏览、编辑 URDF，但没有 MJCF / USD 的解析转换接口。
-
-## 使用
-
-1. 文件栏中加载完整模型文件夹（包括 MJCF include、USD 引用层、网格与贴图），或选择内置的 MJCF / USD 双连杆示例。
-2. MJCF / USD 自动生成 **URDF 工作副本**，可调关节、测量、编辑并查看静力学。原始文件保持不变；质量缺失时静力学会提示，转换器不会凭空补质量。
-3. 文件栏的“格式转换”选择 URDF、MJCF 或 USD，点击“转换并下载”。使用当前编辑器中的代码，无须先重新加载；拖动滑块的当前关节角度不作为模型零位写入。
-4. 解压 ZIP 后打开 `model.urdf`、`model.xml` 或二进制 `model.usd`，保持 `meshes/` 相邻。包中包含 `conversion-report.json`，记录单位与转换差异。
-
-MJCF / USD 的编辑器按钮为“导出 URDF 包”，会一起打包工作副本及其网格；不会用 URDF 文本覆盖原始 MJCF 或 USD。原生 URDF 的“保存”仍覆盖已授权的源文件。
-
-![MJCF / USD 加载、关节控制与格式转换](images/format-conversion.png)
-
-## 支持范围与差异
-
-| 数据 | 行为 |
-| --- | --- |
-| 刚体与关节 | 树形结构，固定、转动、连续转动、移动关节；自由根保留为浮动连接。保留关节轴、原点、限位、已知力矩与速度限值。 |
-| 坐标与惯量 | 内部统一为米、千克、弧度、Z 向上；处理 USD 的单位、Y/Z 向上、关节两侧坐标、主惯量轴。 |
-| 几何 | 盒、球、圆柱、三角网格；MJCF 胶囊与椭球、USD 基础几何转为三角网格。网格导出为 OBJ；材质保留常量 RGBA。 |
-| 文件资源 | MJCF include / default、USD 引用层与 USDZ；引用文件必须位于上传文件夹中。共享网格按内容去重。 |
-| 控制与扩展 | 控制器、传动、传感器、肌腱、动画和仿真器扩展不会等价迁移。URDF mimic 在 MJCF 中使用线性 equality，在 USD 中仅保存为 `urdf:*` 元数据。 |
-
-转换不等于仿真器之间的动力学等价。未知的惯量、速度或电机参数会在说明中标记，不会伪造。MJCF 导出要求运动刚体具有正质量和有效惯量；多关节 MJCF 可展开为串联帧浏览，零质量运动帧不能直接回写为 MJCF。
-
-球铰、通用 D6、闭环或多父约束、MJCF 插件与 asset-model attach、带缩放的 USD 刚体帧、含孔或超过四顶点面的 USD 网格，需要先在源工具中展开、烘焙或三角化。无法表示的结构会报错，保留上一个已加载模型。USD 细分面显示控制网格；贴图与复杂材质不会迁移。包含 URI / 网络或文件夹外绝对路径的依赖需要先收集到模型文件夹中。
-
-单次上传上限 384 MiB / 1500 个文件；原生解析在独立进程中运行，超时会提示。相同服务支持两项并行转换。
+需要 Python 3.10+。打开 [localhost:8080/?formats=native](http://localhost:8080/?formats=native) **显式启用原生模式**；不带参数时仍使用浏览器模式。服务自动选择 `.venv-formats/bin/python`，也可用 `--python /path/to/python` 指定。此模式会把模型传给本机服务处理，USD 输出为二进制 `.usd`。
 
 ## 验证
 
 ```bash
+# Edge + 普通静态服务器：六方向互转、网格、工作副本、关节与零 API 请求
+URDF_TEST_BROWSER_FORMATS=1 CHROME_BIN=/usr/bin/microsoft-edge .venv-formats/bin/python tests/model_formats_browser.py
+# 原生模式
+CHROME_BIN=/usr/bin/microsoft-edge .venv-formats/bin/python tests/model_formats_browser.py
 .venv-formats/bin/python -m unittest discover -s tests -p test_model_formats.py
-.venv-formats/bin/python tests/model_formats_browser.py
-python3 tests/browser_smoke.py
+# 原有工作台回归
+CHROME_BIN=/usr/bin/microsoft-edge python3 tests/browser_smoke.py
 ```
 
-可设置 `CHROME_BIN=/usr/bin/microsoft-edge` 使用 Edge。浏览器测试实际上传 MJCF / 二进制 USD、下载六方向转换包并重载，检查关节限位、网格与副本导出。数值测试对比多个角度下的质心、惯量与几何位置。
+测试工具使用原生 SDK 独立核对浏览器生成文件的质心、惯量和不同关节角度下的几何位置；SDK 仅为开发验证依赖，网页用户无需安装。
 
-参考：[MuJoCo XML](https://mujoco.readthedocs.io/en/stable/XMLreference.html)、[OpenUSD Physics](https://openusd.org/release/api/usd_physics_page_front.html)。
+参考：[MuJoCo XML](https://mujoco.readthedocs.io/en/stable/XMLreference.html)、[OpenUSD Physics](https://openusd.org/release/api/usd_physics_page_front.html)、[USD 变换](https://openusd.org/release/user_guides/schemas/usdGeom/Xformable.html)。
 
 ---
 
 ## English
 
-Load URDF, MJCF (`.xml` / `.mjcf`), and USD (`.usd` / `.usda` / `.usdc` / `.usdz`), and convert in all six directions. The native readers are **MuJoCo** and **OpenUSD**, including binary USD support.
+**URDF / MJCF / text USDA loading and all six conversion directions work directly on GitHub Pages and ordinary static hosting.** Parsing, mesh conversion and ZIP generation run locally in your browser. No Python installation or model uploads.
 
-Create the `.venv-formats` environment, install `requirements-formats.txt`, and start `python3 model_server.py --port 8080` using the commands above. Python 3.10+ is required. The server automatically selects the environment; `--python` overrides it. Open [localhost:8080](http://localhost:8080). Ordinary static hosting still supports URDF without native conversion.
+Load an example or a complete model folder. MJCF / USDA imports become explicit URDF working copies for the existing joint, measurement, editing and statics tools. Choose a target under **Convert format** and download a ZIP; online USD export is standard text **`model.usda`**. Keep the model and `meshes/` together and read `conversion-report.json`. Conversion uses editor source, not slider values as new model zero positions. **Export URDF ZIP** retains native sources; original URDF save-in-place behavior is unchanged.
 
-Load the complete model folder, including referenced layers / includes and meshes. MJCF / USD become explicit **URDF working copies** for the existing joint, measurement, editing and statics tools. The original native files are retained. **Export URDF ZIP** includes the working XML and its meshes; it does not overwrite the native source. Original URDF files retain their normal save-in-place behavior.
+For development, any static server works, including `python3 -m http.server 8080`; Python then serves files only. File imports also work via `file://`, but bundled examples require HTTP.
 
-Under **Convert format**, choose a target and download the ZIP. Conversions use the current editor text, not slider positions as a new zero pose. Extract the package and keep the `meshes/` folder beside the native entry file. Read `conversion-report.json` for differences.
+Browser readers support rigid-body trees, fixed / revolute / continuous / prismatic joints and floating roots; joint frames, limits, explicit mass, COM and inertia; MJCF includes / defaults, angle units and primitive mass / density; flattened USDA with common xform operations, units, Y/Z up, UsdPhysics joint frames and principal inertia axes. Mesh conversion supports STL, OBJ and DAE. USDA meshes need triangles or quads. Materials reduce to constant RGBA.
 
-Supported interchange covers rigid-body trees, fixed / revolute / continuous / prismatic joints, floating roots, frames, limits, explicit masses, centers of mass and inertia. Units normalize to metres, kilograms, radians and Z-up. USD joint frames and principal inertia axes are transformed. Primitive shapes and meshes are supported; some shapes are tessellated, OBJ meshes are packed, and materials reduce to constant RGBA.
+Browser limitations: binary USD / USDZ; USD composition, variants, over / class specs, animation and nonzero joint reference-frame mismatch; MJCF multi-joint bodies, ball joints, procedural models and plugins; closed loops / D6 constraints. Flatten, bake, triangulate or expand these in the source tool first. Missing mesh-body masses / inertias are not invented. MJCF export requires physical positive inertia on moving bodies. Controllers, sensors, tendons, textures and simulator extensions are not reconstructed. Interchange does **not** guarantee equivalent simulation dynamics. Unsupported inputs fail explicitly and retain the last model. Inputs are limited to 384 MiB / 1500 files; large meshes use browser memory and CPU.
 
-Controller, sensor, tendon, transmission, animation and simulator-specific semantics are not transferred. Mimic is a linear equality in MJCF and `urdf:*` metadata in USD. Conversion does **not** guarantee equivalent simulation dynamics. Missing physical parameters are reported. MJCF export requires positive mass / inertia on moving bodies, including any expanded joint frames.
+**Optional native mode:** for binary USD / USDZ, referenced USD layers and more complete native MJCF parsing, install `requirements-formats.txt` in `.venv-formats` and start `python3 model_server.py`. Python 3.10+ is required. Explicitly open [localhost:8080/?formats=native](http://localhost:8080/?formats=native). This mode sends files to your local service, uses MuJoCo / OpenUSD and exports binary USD. Without the query parameter, the browser mode remains the default.
 
-Unsupported spherical / D6 / closed-loop constraints, MJCF plugins and asset-model attachments, scaled USD rigid frames, mesh holes and USD polygons with more than four vertices require flattening / baking / triangulation first. Unsupported inputs fail explicitly and retain the previously loaded viewer model. Subdivision meshes use their polygon cage. Texture maps / complex shaders are not transferred. All external resources must be included in the uploaded folder.
-
-Uploads are limited to 384 MiB / 1500 files. Native parsing uses isolated worker processes with a timeout. Run the validation commands above; set `CHROME_BIN` for a specific browser.
+The validation commands above test both engines. Native SDKs independently check browser-exported physical frames and inertial data during development; they are not runtime requirements for online users.
