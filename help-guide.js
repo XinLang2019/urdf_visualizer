@@ -15,9 +15,8 @@
         {title:'静力学与斜坡',image:'slope-statics.png',alt:'四足贴合斜坡，显示关节力矩、机身角度与接触力',
           lines:['调好站姿，开启“受力分析”；点击力矩标签查看力与力臂，再次点击恢复。','设置坡度、坡向和摩擦系数，点击“一键贴合斜坡”，查看机身角度与轮轴力矩。']}
       ],
-      motionTitle:'全身轨迹规划',motionNote:'用 python3 planner_server.py 启动服务，进入“轨迹”→ 加载规划 Go2 → 设置接触时序、摩擦、电机限值和姿态约束 → 开始规划。实时显示 IPOPT 迭代与残差，收敛且通过离散约束检查后自动播放；可停止、保存并导出力矩与接触力。旧功能位于“手动关键帧”。',
       saveTitle:'编辑与保存',save:'应用代码到模型',write:'保存回源文件',
-      saveNote:'编辑器内 Ctrl + S 保存源文件；轨迹栏内保存动作工程。源文件首次保存可能需要授权，保存后需重新加载应用代码。',
+      saveNote:'编辑器内 Ctrl + S 保存源文件。首次保存可能需要授权，保存后需重新加载以应用修改。',
       controlsTitle:'视图快捷操作',
       controls:[['左键拖动空白','旋转'],['右键拖动','平移'],['滚轮','缩放'],['F','适应模型'],['Esc','清除测量 / 关闭帮助']],
       note:'静力学结果为静态估算；无法稳定支撑或摩擦不足时，请先调整姿态或参数。',
@@ -36,9 +35,8 @@
         {title:'Statics & slopes',image:'slope-statics.png',alt:'Robot fitted to a slope with joint torques, body attitude, and contact forces',
           lines:['Set a standing pose and enable Statics. Click a torque label for forces and moment arms; click again to restore labels.','Set slope angle, heading, and friction, then Fit supports to slope. Inspect body attitude and wheel holding torques.']}
       ],
-      motionTitle:'Whole-body motion planning',motionNote:'Start python3 planner_server.py. Open Motion → load planner Go2 → set contact phases, friction, motor and pose constraints → Plan. Watch live IPOPT iterations and residuals; converged, discrete-constraint-checked results play automatically. Stop, save, and export torques/contact forces. The previous editor is under Manual keyframes.',
       saveTitle:'Edit & save',save:'Apply code to model',write:'Save back to source',
-      saveNote:'Ctrl + S saves source in the editor, or a motion project in Motion. Source saving may need permission. Reload to apply saved code to the model.',
+      saveNote:'Ctrl + S saves source in the editor. Saving may need permission. Reload to apply saved code to the model.',
       controlsTitle:'View controls',
       controls:[['Left-drag background','Orbit'],['Right-drag','Pan'],['Scroll','Zoom'],['F','Fit model'],['Esc','Clear measurement / close help']],
       note:'Static loads are estimates. Adjust the pose or parameters if support is unstable or friction is insufficient.',
@@ -72,7 +70,6 @@
       for(const text of card.lines)body.append(element('p','',text));
       article.append(link,body);grid.append(article);
     });
-    const motion=element('section','help-save');motion.append(element('h3','',guide.motionTitle),element('p','',guide.motionNote));
     const save=element('section','help-save');save.append(element('h3','',guide.saveTitle));
     const actions=element('div','help-save-actions');
     for(const [key,label]of [['Ctrl + Enter',guide.save],['Ctrl + S',guide.write]]){
@@ -83,7 +80,7 @@
     const list=element('dl');
     for(const [key,value]of guide.controls){const item=element('div');item.append(element('dt','',key),element('dd','',value));list.append(item);}
     controls.append(list);
-    container.replaceChildren(intro,grid,motion,save,controls,element('p','help-note',guide.note));
+    container.replaceChildren(intro,grid,save,controls,element('p','help-note',guide.note));
     document.getElementById('help-footer-hint').textContent=guide.footer;
     document.getElementById('close-help').setAttribute('aria-label',guide.close);
   };

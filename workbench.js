@@ -35,9 +35,6 @@
     workspace:['工作栏','Workspace'],
     files:['文件','Files'],
     joints:['关节','Joints'],
-    animate:['轨迹','Motion'],
-    motion:['轨迹','Motion'],
-    motionTitle:['全身轨迹规划','Whole-body motion planning'],
     structure:['结构','Structure'],
     editor:['编辑','Editor'],
     help:['帮助','Help'],
@@ -115,10 +112,12 @@
     writeDenied:['未获得源文件写入权限，编辑内容仍保留','Write permission was not granted. Your edits are retained'],
     loading:['正在加载模型…','Loading model…'],
     chooseFirst:['请先选择示例模型','Choose an example model first'],
+    localServerIntro:['当前通过 file:// 打开。内置示例需要通过 HTTP 加载，请在项目目录运行：','Opened via file://. Bundled examples require HTTP. Run in the project directory:'],
+    localServerOpen:['打开本地工作台 →','Open the local workbench →'],
+    localServerRequired:['file:// 无法读取内置模型资源。请在项目目录运行 python3 -m http.server 8080，然后打开 http://localhost:8080/','file:// cannot fetch bundled model resources. Run python3 -m http.server 8080 in the project directory, then open http://localhost:8080/'],
     noUrdf:['未找到 URDF / XML 文件，请选择包含模型的文件夹','No URDF / XML found. Choose a folder containing a robot model.'],
     pickSecond:['已选第一个点，请 Shift + 点击第二个点','First point selected. Shift + click a second point.'],
     emptySource:['请先加载模型或在编辑器中输入 URDF','Load a model or enter URDF in the editor first'],
-    noMovable:['模型没有可动画的单轴关节','This model has no movable single-axis joints'],
     unsaved:['有未处理的编辑；请先保存或重新加载，再切换模型','Save or apply your edits before switching models'],
     loadFailed:['加载失败','Load failed'],
     meshMissing:['资源加载失败','Missing resources'],
@@ -145,10 +144,11 @@
   const sourceFiles=new URDFSourceFiles(t);
   // Keep initialization failures visible even when WebGL is unavailable.
   let THREE, viewer, grid;
-  let activeDragJoint=null,statics=null,motion=null;
+  let activeDragJoint=null,statics=null;
   const jointAngleUI={dragging:false,editing:false,hovered:false,hideTimer:0,frame:0,factor:1,unit:''};
   function status(message, kind='') { $('status-text').removeAttribute('data-i18n'); $('status-text').textContent=message; $('status').className=kind; }
   function fail(error) { $('editor-error').hidden=false; $('editor-error').textContent=error.message || String(error); status(`${t('loadFailed')} · ${error.message || error}`, 'error'); }
+  $('local-server-notice').hidden=location.protocol!=='file:';
   try {
     THREE = parcelRequire('../node_modules/three/build/three.module.js');
     const Manipulator = parcelRequire('../src/urdf-manipulator-element.js').default;
@@ -164,11 +164,9 @@
   const updateEnvironment=viewer._updateEnvironment.bind(viewer);
   viewer._updateEnvironment=()=>{
     if(!viewer.robot || objectBounds(viewer.robot).isEmpty())return;
-    const target=motion?.groundLocked?viewer.controls.target.clone():null;
     updateEnvironment();
     grid.position.y=viewer.plane.position.y+.002;
     statics?.syncTerrainEnvironment();
-    if(target){viewer.controls.target.copy(target);motion.restoreGround();}
   };
   viewer.noAutoRecenter=true;
   viewer.highlightColor='#68b7ff';
@@ -267,21 +265,20 @@
     else if(['gltf','glb'].includes(extension))new loaders.GLTFLoader(manager).load(path,result=>finish(result.scene),undefined,onError);
     else {manager.itemError(path);finish(null,new Error(`Unsupported mesh: ${extension}`));}
   }
-  function stopAnimation() { motion?.pause(); }
   function hasEdits() { return state.saving || ($('source').value!==state.baseline && $('source').value!==state.context?.sourceFile?.savedText); }
   async function loadText(text, context, {replaceEditor=true}={}) {
     text=text.replace(/\r\n?/g,'\n');
     const xml=validate(text);
     context.sourceFile ||= {name:context.name,handle:null,savedText:null,written:false};
     const version=++state.version;
-    stopAnimation(); status(t('loading'),'loading'); $('editor-error').hidden=true;
+    status(t('loading'),'loading'); $('editor-error').hidden=true;
     const failures=new Set();
     const manager=new THREE.LoadingManager();
     manager.setURLModifier(path=>resolveAsset(path,context));
     manager.onError=path=>failures.add(path);
     const loader=new URDFLoader(manager);
     loader.parseCollision=true;
-    loader.workingPath=context?.workingPath ?? (context?.base || new URL('.',location.href).href);
+    loader.workingPath=context?.base || new URL('.',location.href).href;
     loader.packages=pkg=>context?.assets ? new URL(`/__local__/${pkg}`,location.href).href : new URL(`urdf/${pkg}`,location.href).href;
     loader.loadMeshCb=loadMesh;
     let robot;
@@ -293,7 +290,7 @@
     // Swap only after XML and meshes finish. Invalid edits retain the current model.
     resetModelPointer();clearJointAngleUI();cancelLinkNavigation();clearMeasurement(); clearSelection();
     state.helpers.forEach(helper=>dispose(helper.object)); state.helpers=[];
-    motion?.beforeModelChanged();dispose(viewer.robot);
+    dispose(viewer.robot);
     const oldContext=state.context;
     viewer.robot=robot;viewer.world.visible=true;viewer.world.add(robot);
     robot.traverse(child=>{if(child.isMesh){child.castShadow=true;child.receiveShadow=true;const mats=Array.isArray(child.material)?child.material:[child.material];mats.forEach(mat=>{if(mat?.map)mat.map.colorSpace=THREE.SRGBColorSpace;});}});
@@ -311,7 +308,7 @@
     $('joints-empty').hidden=true;$('joint-content').hidden=false;$('structure-empty').hidden=true;
     $('structure-count').hidden=false;$('structure-count').textContent=`${linkCount} / ${jointCount}`;
     $('graph-measure').disabled=false;
-    buildHierarchy();buildFileTree();buildJoints();buildTree();buildHelpers();applyDisplay();fitView();updateEditor();statics?.modelChanged();motion?.modelChanged();
+    buildHierarchy();buildFileTree();buildJoints();buildTree();buildHelpers();applyDisplay();fitView();updateEditor();statics?.modelChanged();
     if(failures.size){status(`${t('meshMissing')} · ${failures.size}`, 'error');$('editor-error').textContent=`${t('meshMissing')}: ${[...failures].map(p=>decodeURIComponent(p)).join('\n')}`;$('editor-error').hidden=false;}
     else status(`${t('modelLoaded')} · ${context.name}`);
     return true;
@@ -321,6 +318,7 @@
     if(hasEdits())return status(t('unsaved'),'error');
     const path=$('example-select').value;
     if(!path)return status(t('chooseFirst'),'error');
+    if(location.protocol==='file:')return fail(new Error(t('localServerRequired')));
     // Some exported examples resolve meshes from their package root.
     const base=$('example-select').selectedOptions[0].dataset.base || '.';
     const version=++state.version;
@@ -529,8 +527,8 @@
           unit.textContent=joint.jointType==='prismatic'?'m':state.radians?'rad':'°';
           slider.setAttribute('aria-valuetext',`${number.value} ${unit.textContent}`);
         };
-        slider.oninput=()=>{stopAnimation();clearSurfaceMeasurement();viewer.setJointValue(joint.name,Number(slider.value));update();};
-        number.onchange=()=>{stopAnimation();const value=Number(number.value)/factor();if(Number.isFinite(value)){clearSurfaceMeasurement();viewer.setJointValue(joint.name,value);}update();};
+        slider.oninput=()=>{clearSurfaceMeasurement();viewer.setJointValue(joint.name,Number(slider.value));update();};
+        number.onchange=()=>{const value=Number(number.value)/factor();if(Number.isFinite(value)){clearSurfaceMeasurement();viewer.setJointValue(joint.name,value);}update();};
         state.rows.set(joint.name,{row,update});update();
       }else{
         const type=document.createElement('span');type.className='joint-type';type.textContent=joint.jointType;heading.append(type);
@@ -553,12 +551,11 @@
   $('joint-search').oninput=filterJoints;$('hide-fixed').onchange=filterJoints;
   for(const [id,radians]of [['unit-rad',true],['unit-deg',false]])$(id).onclick=()=>{state.radians=radians;for(const [other,value]of [['unit-rad',true],['unit-deg',false]]){$(other).classList.toggle('selected',value===radians);$(other).setAttribute('aria-pressed',String(value===radians));}state.rows.forEach(row=>row.update());queueJointAngleUpdate();};
   $('limits').onclick=()=>{state.limits=!state.limits;$('limits').classList.toggle('active',state.limits);$('limits').setAttribute('aria-pressed',String(state.limits));viewer.ignoreLimits=!state.limits;state.rows.forEach(row=>row.update());clearSurfaceMeasurement();queueLinkMeasurementUpdate();};
-  $('reset-joints').onclick=()=>{stopAnimation();clearSurfaceMeasurement();Object.values(viewer.robot?.joints||{}).forEach(j=>viewer.setJointValue(j.name,...j.jointValue.map(()=>0)));};
+  $('reset-joints').onclick=()=>{clearSurfaceMeasurement();Object.values(viewer.robot?.joints||{}).forEach(j=>viewer.setJointValue(j.name,...j.jointValue.map(()=>0)));};
   viewer.addEventListener('angle-change',event=>{state.rows.get(event.detail)?.update();viewer.redraw();});
   for(const [event,on]of [['joint-mouseover',true],['joint-mouseout',false]])viewer.addEventListener(event,e=>state.rows.get(e.detail)?.row.classList.toggle('hovered',on));
-  viewer.addEventListener('manipulate-start',event=>{stopAnimation();clearSurfaceMeasurement();setActiveDragJoint(viewer.robot?.joints[event.detail] || null);});
+  viewer.addEventListener('manipulate-start',event=>{clearSurfaceMeasurement();setActiveDragJoint(viewer.robot?.joints[event.detail] || null);});
   viewer.addEventListener('manipulate-end',()=>setActiveDragJoint(null));
-  $('animate').onclick=()=>motion?.toggle();
 
   let structureGraph=null;
   let showFixedNodes=false;
@@ -905,7 +902,6 @@
       if(!event.isPrimary){resetModelPointer();return;}
       lastModelPointer=event.pointerType==='touch'?null:{clientX:event.clientX,clientY:event.clientY,shiftKey:event.shiftKey,ctrlKey:event.ctrlKey,metaKey:event.metaKey,altKey:event.altKey};
       controls.moveRay(rayFromPointer(event).ray);
-      if(motion?.isBodyLink(hoveredLink))motion.pause();else motion?.hideBodyEditor();
       modelPointerDown={id:event.pointerId,x:event.clientX,y:event.clientY,link:hoveredLink,moved:false,joint:false};
       if(event.pointerType!=='touch' && controls.hovered && !viewer.disableDragging) {
         event.preventDefault();event.stopImmediatePropagation();
@@ -932,10 +928,7 @@
       modelPointerDown=null;
       if(canvas.hasPointerCapture(event.pointerId) && pointer.joint)canvas.releasePointerCapture(event.pointerId);
       const hit=visibleModelHit(rayFromPointer(event));
-      if(!pointer.moved){
-        if(pointer.link && hit?.link===pointer.link){selectLink(hit.link);if(!motion?.pickBody(hit.link,hit.point))motion?.hideBodyEditor();}
-        else motion?.hideBodyEditor();
-      }
+      if(!pointer.moved && pointer.link && hit?.link===pointer.link)selectLink(hit.link);
       setHoveredLink(event.pointerType==='touch'?null:hit?.link || null);
       canvas.style.cursor=hoveredLink?'pointer':'';
     },true);
@@ -943,7 +936,7 @@
     canvas.addEventListener('dblclick',event=>{
       if(event.button!==0 || event.ctrlKey || event.metaKey || event.shiftKey || linkMeasurement.pinned)return;
       const hit=visibleModelHit(rayFromPointer(event));if(!hit?.link)return;
-      event.preventDefault();event.stopPropagation();motion?.hideBodyEditor();navigateToLink(hit.link);
+      event.preventDefault();event.stopPropagation();navigateToLink(hit.link);
     });
     canvas.addEventListener('pointercancel',resetModelPointer);
     canvas.addEventListener('lostpointercapture',()=>{if(modelPointerDown?.joint)resetModelPointer();});
@@ -1014,7 +1007,7 @@
   }
   function startJointAngleEdit() {
     const joint=activeDragJoint;if(!joint || jointAngleUI.dragging)return;
-    stopAnimation();clearTimeout(jointAngleUI.hideTimer);jointAngleUI.editing=true;
+    clearTimeout(jointAngleUI.hideTimer);jointAngleUI.editing=true;
     jointAngleUI.factor=joint.jointType==='prismatic' || state.radians?1:180/Math.PI;
     jointAngleUI.unit=joint.jointType==='prismatic'?'m':state.radians?'rad':'°';
     const input=$('joint-angle-input');input.value=String(Number(((joint.angle || 0)*jointAngleUI.factor).toFixed(6)));input.setCustomValidity('');
@@ -1036,7 +1029,7 @@
     }
     // This direct edit always respects declared limits, including when the toolbar toggle is off.
     const clamped=joint.jointType==='continuous'?value:THREE.MathUtils.clamp(value,joint.limit.lower,joint.limit.upper);
-    stopAnimation();clearSurfaceMeasurement();viewer.setJointValue(joint.name,clamped);
+    clearSurfaceMeasurement();viewer.setJointValue(joint.name,clamped);
     $('joint-angle-feedback').textContent=clamped!==value?t('jointAngleClamped'):'';
     finishJointAngleEdit();$('joint-angle-readout').focus({preventScroll:true});
   }
@@ -1174,7 +1167,6 @@
   $$('[data-display]').forEach(button=>button.onclick=()=>{const key=button.dataset.display;state.display[key]=!state.display[key];button.classList.toggle('active',state.display[key]);button.setAttribute('aria-pressed',String(state.display[key]));applyDisplay();});
   function updateCameraFrame() {
     let left=0,right=0,top=72,bottom=40;
-    if(!$('motion-timeline').hidden)bottom=Math.max(bottom,innerHeight-$('motion-timeline').getBoundingClientRect().top+12);
     const visible=panel=>!panel.hidden && getComputedStyle(panel).display!=='none';
     if(innerWidth>600) {
       const sidebar=$('workspace-sidebar'),editor=$('editor-panel');
@@ -1190,16 +1182,16 @@
     queueJointAngleUpdate();statics?.requestProjection();
     return {width:width/innerWidth,height:height/innerHeight};
   }
-  function fitView(bounds=null) {
-    const box=bounds?.isBox3?bounds:viewer.robot?objectBounds(viewer.robot):new THREE.Box3(new THREE.Vector3(-.7,0,-.7),new THREE.Vector3(.7,1,.7));
+  function fitView() {
+    const box=viewer.robot?objectBounds(viewer.robot):new THREE.Box3(new THREE.Vector3(-.7,0,-.7),new THREE.Vector3(.7,1,.7));
     const center=box.isEmpty()?new THREE.Vector3(0,.3,0):box.getCenter(new THREE.Vector3()), size=box.isEmpty()?1.5:box.getSize(new THREE.Vector3()).length();
     const available=updateCameraFrame();
     const distance=Math.max(size, .25)/(2*Math.tan(THREE.MathUtils.degToRad(viewer.camera.fov/2)))*Math.max(1.2,1/(viewer.camera.aspect*available.width),1/available.height);
     viewer.controls.target.copy(center);viewer.camera.position.copy(center).add(new THREE.Vector3(1,.75,1).normalize().multiplyScalar(distance));viewer.controls.maxDistance=Math.max(50,distance*8);viewer.camera.far=Math.max(1000,distance*12);viewer.camera.updateProjectionMatrix();viewer.controls.update();
-    if(!bounds?.isBox3 && !motion?.groundLocked && viewer.robot && !box.isEmpty()){grid.position.y=box.min.y-.003;viewer.plane.position.y=box.min.y-.002;viewer._updateEnvironment();}viewer.redraw();updateGizmo();
+    if(viewer.robot && !box.isEmpty()){grid.position.y=box.min.y-.003;viewer.plane.position.y=box.min.y-.002;viewer._updateEnvironment();}viewer.redraw();updateGizmo();
   }
   $('fit-view').onclick=fitView;
-  $('up-select').onchange=()=>{viewer.up=$('up-select').value;fitView();queueLinkMeasurementUpdate();statics?.orientationChanged();motion?.orientationChanged();};
+  $('up-select').onchange=()=>{viewer.up=$('up-select').value;fitView();queueLinkMeasurementUpdate();statics?.orientationChanged();};
   function updateGizmo(){const lines=$('gizmo-lines'),labels=$('gizmo-labels');lines.replaceChildren();labels.replaceChildren();const inverse=viewer.camera.quaternion.clone().invert(),rotation=viewer.world.quaternion;
     const items=[['X',new THREE.Vector3(1,0,0),'#ff5269'],['Y',new THREE.Vector3(0,1,0),'#a4db3b'],['Z',new THREE.Vector3(0,0,1),'#439bff']].map(([name,direction,color])=>({name,direction,color,point:direction.clone().applyQuaternion(rotation).applyQuaternion(inverse)})).sort((a,b)=>a.point.z-b.point.z);
     for(const {name,direction,color,point}of items){const x=55+point.x*33,y=50-point.y*33;const line=document.createElementNS('http://www.w3.org/2000/svg','line');for(const [key,val]of Object.entries({x1:55,y1:50,x2:x,y2:y,stroke:color,'stroke-width':1.5}))line.setAttribute(key,val);lines.append(line);const g=document.createElementNS(line.namespaceURI,'g');g.setAttribute('role','button');g.setAttribute('tabindex','0');g.setAttribute('aria-label',`${name} view`);const circle=document.createElementNS(line.namespaceURI,'circle');for(const [key,val]of Object.entries({cx:x,cy:y,r:10,fill:color}))circle.setAttribute(key,val);const text=document.createElementNS(line.namespaceURI,'text');text.setAttribute('x',x);text.setAttribute('y',y+4);text.setAttribute('text-anchor','middle');text.textContent=name;g.append(circle,text);const click=()=>{const distance=viewer.camera.position.distanceTo(viewer.controls.target);const axis=direction.clone().applyQuaternion(rotation);viewer.camera.position.copy(viewer.controls.target).addScaledVector(axis,distance);if(Math.abs(axis.y)>.99)viewer.camera.position.z+=.0001;viewer.controls.update();viewer.redraw();updateGizmo();};g.onclick=click;g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();click();}};labels.append(g);}
@@ -1511,12 +1503,12 @@
         return;
       }
       event.stopImmediatePropagation();event.preventDefault();
-      stopAnimation();clearSurfaceSnap();
+      clearSurfaceSnap();
       if(!linkMeasurement.enabled)setLinkMeasureMode(true,false);
       chooseMeasuredLink(hit.link);return;
     }
     event.stopImmediatePropagation();event.preventDefault();if(!viewer.robot)return;
-    stopAnimation();
+
     const version=state.version,epoch=surfaceMeasurement.epoch;
     const pointer={clientX:event.clientX,clientY:event.clientY,shiftKey:event.shiftKey,ctrlKey:event.ctrlKey,metaKey:event.metaKey,altKey:event.altKey};
     lastModelPointer=pointer;
@@ -1603,9 +1595,9 @@
     }finally{state.saving=false;updateEditor();}
   };
   window.addEventListener('beforeunload',event=>{if(hasEdits()){event.preventDefault();event.returnValue='';}});
-  window.addEventListener('keydown',event=>{if(motion?.handleShortcut(event))return;const editing=/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();$('reload').click();}else if((event.ctrlKey||event.metaKey)&&event.key==='s'){event.preventDefault();$('save').click();}else if(!editing&&event.key.toLowerCase()==='f'){fitView();}else if(!editing&&event.key==='Escape'){clearJointAngleUI();clearMeasurement();clearSelection();viewer.redraw();}});
+  window.addEventListener('keydown',event=>{const editing=/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();$('reload').click();}else if((event.ctrlKey||event.metaKey)&&event.key==='s'){event.preventDefault();$('save').click();}else if(!editing&&event.key.toLowerCase()==='f'){fitView();}else if(!editing&&event.key==='Escape'){clearJointAngleUI();clearMeasurement();clearSelection();viewer.redraw();}});
 
-  const leftPanels=['files','joints','structure','motion'];
+  const leftPanels=['files','joints','structure'];
   function refreshWorkspace() {
     const mobile=innerWidth<=600,sidebar=$('workspace-sidebar');
     sidebar.classList.toggle('collapsed',state.sidebarCollapsed);
@@ -1643,7 +1635,6 @@
     queueLinkMeasurementUpdate();
   }
   function setPanel(name,visible) {
-    if(name==='motion'&&visible&&motion&&!motion.isOpen)return motion.toggle(true);
     if(leftPanels.includes(name)) {
       if(visible){state.activeTab=name;state.sidebarCollapsed=false;if(innerWidth<=600)state.mobile=name;}
       else if(state.activeTab===name)state.sidebarCollapsed=true;
@@ -1658,7 +1649,6 @@
     const name=button.dataset.panel;
     const visible=name==='editor'?$('editor-panel').hidden||statics?.view==='statics':true;
     if(name==='editor')statics?.setRightView('code',false);
-    if(name==='motion'){motion?.toggle(true);return;}
     setPanel(name,visible);
   });
   $('workspace-toggle').onclick=()=>{
@@ -1727,21 +1717,12 @@
     refreshWorkspace();viewer.redraw();
   });
   statics=createStaticsWorkbench({THREE,viewer,grid,refreshScene:()=>{queueLinkMeasurementUpdate();queueJointAngleUpdate();fitView();},getModel:()=>({xml:state.xml,version:state.version}),getLanguage:()=>lang,openRight:()=>setPanel('editor',true),refreshAxes:refreshJointAngleAxis,project:projectMeasurementPoint});
-  motion=createTrajectoryWorkbench({THREE,viewer,grid,projectPoint:projectMeasurementPoint,fitBounds:fitView,getJointInfo:()=>state.orderedJoints.map(n=>({name:n.name,velocity:Number(direct(n.element,'limit')?.getAttribute('velocity'))})),getLanguage:()=>lang,showPanel:name=>setPanel(name,true),refreshLayout:refreshWorkspace,
-    loadPlanningModel:async()=>{if(hasEdits())throw Error(t('unsaved'));const url=new URL('/api/planner/model',location.href),response=await fetch(url,{cache:'no-store'});if(!response.ok)throw Error('Planner model unavailable');const text=await response.text();return loadText(text,{name:'go2-planner.urdf',path:'planner/go2-planner.urdf',workingPath:'',base:new URL('.',url).href,sourceFile:sourceFiles.fromURL(url,text)});},
-    supportPlane:normal=>statics.motionSupportPlane(normal),detachGround:()=>statics.prepareMotion(),
-    getDescriptionHash:()=>{let hash=2166136261;for(let i=0;i<state.source.length;i++)hash=Math.imul(hash^state.source.charCodeAt(i),16777619);return (hash>>>0).toString(16);},
-    beforePose:()=>{clearSurfaceMeasurement();statics.prepareMotion({preserveGround:true});motion?.restoreGround();},
-    onPose:()=>{viewer.redraw();queueLinkMeasurementUpdate();queueJointAngleUpdate();statics.requestProjection();},
-    getGround:()=>{viewer.world.updateWorldMatrix(true,false);viewer.plane.updateWorldMatrix(true,false);const inverse=viewer.world.getWorldQuaternion(new THREE.Quaternion()).invert(),normal=new THREE.Vector3(0,0,1).applyQuaternion(viewer.plane.getWorldQuaternion(new THREE.Quaternion())).applyQuaternion(inverse).normalize(),point=viewer.plane.getWorldPosition(new THREE.Vector3());viewer.world.worldToLocal(point);return {normal:normal.toArray(),offset:normal.dot(point)};}
-  });
   $('help').onclick=()=>{$('help-dialog').showModal();$('help-content').scrollTop=0;};$('close-help').onclick=()=>$('help-dialog').close();
-  function translate(){document.documentElement.lang=lang==='zh'?'zh-CN':'en';$$('[data-i18n]').forEach(el=>el.textContent=t(el.dataset.i18n));$('language').textContent=lang==='zh'?'EN':'中文';$('joint-search').placeholder=lang==='zh'?'搜索关节…':'Search joints…';renderURDFHelp($('help-content'),lang);updateEditor();filterJoints();refreshWorkspace();statics?.languageChanged();motion?.languageChanged();updateLinkMeasureUI();updateLinkMeasurement();if(surfaceSnap.pointer)renderSurfaceSnap();if(viewer.robot){$('model-meta').textContent=`${Object.keys(viewer.robot.links).length} ${t('linkTotal')} · ${Object.keys(viewer.robot.joints).length} ${t('jointTotal')}`;}}
+  function translate(){document.documentElement.lang=lang==='zh'?'zh-CN':'en';$$('[data-i18n]').forEach(el=>el.textContent=t(el.dataset.i18n));$('language').textContent=lang==='zh'?'EN':'中文';$('joint-search').placeholder=lang==='zh'?'搜索关节…':'Search joints…';renderURDFHelp($('help-content'),lang);updateEditor();filterJoints();refreshWorkspace();statics?.languageChanged();updateLinkMeasureUI();updateLinkMeasurement();if(surfaceSnap.pointer)renderSurfaceSnap();if(viewer.robot){$('model-meta').textContent=`${Object.keys(viewer.robot.links).length} ${t('linkTotal')} · ${Object.keys(viewer.robot.joints).length} ${t('jointTotal')}`;}}
   $('language').onclick=()=>{lang=lang==='zh'?'en':'zh';translate();};
   $('theme').onclick=()=>{const light=document.body.classList.toggle('light');$('theme').textContent=light?'☀':'☾';document.querySelector('meta[name="theme-color"]').content=light?'#E8F0F8':'#2E6B8A';grid.material.color.set(light?0x2e6b8a:0x6ba3c8);grid.material.opacity=light?.26:.32;viewer.redraw();};
   translate();
-  function animate(now){motion?.tick(now);requestAnimationFrame(animate);}requestAnimationFrame(animate);
   installModelPicking();
   // Small read-only debugging surface for local integration checks.
-  window.urdfWorkbench={get viewer(){return viewer;},get display(){return {...state.display};},get hoveredLink(){return hoveredLink;},get selectedObject(){return state.selected;},get linkMeasurement(){return {enabled:linkMeasurement.enabled,links:linkMeasurement.links.map(link=>link.name),unit:linkMeasurement.unit,distance:linkMeasurement.distance,delta:linkMeasurement.delta?.toArray() || null};},get surfaceMeasurement(){return {anchors:surfaceMeasurement.anchors.map(a=>({link:a.link.name,kind:a.kind,fitted:a.fitted,local:a.local.toArray(),world:a.object.localToWorld(a.local.clone()).toArray()})),unit:surfaceMeasurement.unit,distance:surfaceMeasurement.distance,delta:surfaceMeasurement.delta?.toArray() || null};},get statics(){return statics.snapshot;},get motion(){return motion?.snapshot;},get loading(){return $('status').classList.contains('loading');}};
+  window.urdfWorkbench={get viewer(){return viewer;},get display(){return {...state.display};},get hoveredLink(){return hoveredLink;},get selectedObject(){return state.selected;},get linkMeasurement(){return {enabled:linkMeasurement.enabled,links:linkMeasurement.links.map(link=>link.name),unit:linkMeasurement.unit,distance:linkMeasurement.distance,delta:linkMeasurement.delta?.toArray() || null};},get surfaceMeasurement(){return {anchors:surfaceMeasurement.anchors.map(a=>({link:a.link.name,kind:a.kind,fitted:a.fitted,local:a.local.toArray(),world:a.object.localToWorld(a.local.clone()).toArray()})),unit:surfaceMeasurement.unit,distance:surfaceMeasurement.distance,delta:surfaceMeasurement.delta?.toArray() || null};},get statics(){return statics.snapshot;},get loading(){return $('status').classList.contains('loading');}};
 })();

@@ -23,7 +23,6 @@ from support_fitting import check_support_fitting, check_go2_support_fit
 from statics_labels import check_statics_labels
 from editor_save import check_editor_save
 from wheel_contacts import check_wheel_contacts
-from trajectory_editor import check_trajectory_editor
 
 ROOT = Path(__file__).resolve().parents[1]
 BROWSER = os.environ.get('CHROME_BIN') or next((shutil.which(name) for name in ['google-chrome', 'chromium', 'chromium-browser'] if shutil.which(name)), None)
@@ -53,6 +52,7 @@ def run(client, url, output):
     client.call('Page.navigate', {'url': url})
     client.until('!!window.urdfWorkbench')
     check(client, '!document.querySelector("#status.error")', 'WebGL initializes without external dependencies')
+    check(client, 'JSON.stringify([...document.querySelectorAll(".workspace-tabs [role=tab]")].map(tab=>tab.dataset.panel))===JSON.stringify(["files","joints","structure"])', 'workspace contains only files, joints and structure')
     check(client, 'document.getElementById("graph-measure").disabled', 'link measurement is disabled until a model is loaded')
     client.screenshot(str(output / 'empty.png'))
     for model in ['anymal_c/urdf/anymal_c', 'anymal_b/urdf/anymal_b', 'g1/urdf/g1', 'cassie/urdf/cassie', 'go2/urdf/go2']:
@@ -109,7 +109,6 @@ def run(client, url, output):
     check(client, 'urdfWorkbench.viewer.robot.joints.FL_hip_joint.angle>2', 'limits can be disabled')
     click(client, 'limits')
     click(client, 'reset-joints')
-    check_trajectory_editor(client, output, check)
     for key in ['visual', 'collision', 'inertia', 'com', 'axes', 'jointAxes', 'shadow', 'lighting', 'grid']:
         client.js('document.querySelector(' + json.dumps(f'[data-display="{key}"]') + ').click()')
     check(client, '!urdfWorkbench.display.visual && urdfWorkbench.display.collision && !urdfWorkbench.display.grid', 'display controls change render state')
@@ -196,7 +195,7 @@ def main():
     output = Path(tempfile.mkdtemp(prefix='urdf-viewer-checks-'))
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     with tempfile.TemporaryDirectory(prefix='urdf-viewer-chrome-') as profile, open(output / 'browser.log', 'w') as log:
-        server_command=[sys.executable,str(ROOT/'planner_server.py'),'--port',str(server_port)] if os.environ.get('URDF_TEST_PLANNER')=='1' else [sys.executable,'-m','http.server',str(server_port),'--bind','127.0.0.1']
+        server_command=[sys.executable,'-m','http.server',str(server_port),'--bind','127.0.0.1']
         server = subprocess.Popen(server_command, cwd=ROOT, stdout=log, stderr=log)
         chrome = subprocess.Popen([BROWSER, '--headless=new', '--no-sandbox', '--disable-dev-shm-usage', '--disable-background-networking', '--enable-unsafe-swiftshader', '--use-angle=swiftshader', f'--remote-debugging-port={debug_port}', f'--remote-allow-origins=http://localhost:{debug_port}', '--user-data-dir=' + profile, 'about:blank'], stdout=log, stderr=log)
         client = None

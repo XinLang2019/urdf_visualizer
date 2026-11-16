@@ -427,6 +427,18 @@ body.resizing-dock,body.resizing-dock * {
   display:flex;
   flex-direction:column;
 }
+.local-server-notice {
+  margin:14px 14px 0;
+  padding:12px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:var(--selection);
+  font-size:12px;
+  line-height:1.6;
+}
+.local-server-notice p { margin:0 0 8px; }
+.local-server-notice code { display:block; overflow-wrap:anywhere; }
+.local-server-notice a { display:inline-block; margin-top:8px; color:var(--blue); }
 .import-area {
   flex:1;
   display:flex;
@@ -1677,94 +1689,3 @@ body.light #link-measure-dz,body.light #surface-measure-dz {
 .statics-wheel-row strong {font:600 11px ui-monospace,monospace;}
 .statics-wheel-row small {grid-column:1/-1;color:var(--muted);font-size:10px;}
 .statics-wheel-row.over-limit {border-color:var(--focus);border-style:dashed;}
-
-/* Keyframe motion authoring: controls in the left dock, compact timeline below 3D. */
-.panel-motion .panel-body {padding:12px;overflow:auto;}
-#motion-status:empty {display:none;}
-#motion-status {margin:0 0 10px;overflow-wrap:anywhere;}
-#motion-status.error {color:#ff9d9d;}
-#motion-content input:not([type=checkbox]),#motion-content select {width:100%;min-width:0;padding:5px 7px;}
-.motion-field {display:flex;flex-direction:column;gap:4px;margin:8px 0;color:var(--muted);font-size:11px;min-width:0;}
-.motion-actions {display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;}
-.motion-actions button {flex:1;padding:4px 8px;}
-#motion-record {background:var(--blue);color:var(--on-accent);}
-.motion-group {border-top:1px solid var(--line);margin-top:14px;padding-top:12px;}
-.motion-group h3 {margin:0 0 7px;font-size:12px;color:var(--text);}
-.motion-group p,.motion-note {font-size:10px;line-height:1.7;}
-.motion-note {color:var(--muted);}
-.motion-pose-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 8px;}
-.motion-keyframes {max-height:200px;overflow:auto;display:flex;flex-direction:column;gap:4px;margin:12px 0;}
-.motion-keyframes button {text-align:left;overflow:hidden;text-overflow:ellipsis;min-height:28px;border-radius:6px;font:11px ui-monospace,monospace;}
-.motion-keyframes button.selected {background:var(--selection);border-color:var(--focus);}
-#motion-edit-joints {width:100%;margin:10px 0 3px;}
-#motion-timeline {position:fixed;z-index:12;left:calc(var(--dock-left) + 24px);right:calc(var(--dock-right) + 24px);bottom:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 30px var(--shadow);padding:10px 14px;}
-.motion-transport {display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
-.motion-transport button {padding:2px 8px;min-height:26px;border-radius:7px;}
-#motion-play {background:var(--blue);color:var(--on-accent);min-width:32px;}
-.motion-transport select {padding:2px 5px;min-height:25px;}
-#motion-time {font:11px ui-monospace,monospace;color:var(--text);margin-right:auto;white-space:nowrap;}
-.motion-transport .motion-field {flex-direction:row;align-items:center;margin:0 4px;}
-#motion-close {margin-left:auto;}
-.motion-graph {position:relative;margin:10px 8px 0;height:47px;}
-#motion-curve {display:block;width:100%;height:100%;overflow:visible;}
-#motion-curve path {fill:none;stroke:var(--blue);stroke-width:2;}
-.motion-markers {position:absolute;inset:0;}
-.motion-markers button {position:absolute;top:-7px;transform:translateX(-50%);border:0;min-height:22px;line-height:20px;padding:0 2px;color:var(--muted);font-size:16px;touch-action:none;}
-.motion-markers button.selected {color:var(--color-frost);text-shadow:0 0 5px var(--blue);}
-body.light .motion-markers button.selected {color:var(--color-deep-tide);}
-#motion-playhead {position:absolute;top:0;bottom:0;width:1px;background:var(--focus);pointer-events:none;}
-#motion-cursor {display:block;width:100%;height:12px;margin:2px 0 6px;}
-.motion-curve-tools {display:flex;align-items:center;gap:10px;font-size:10px;}
-.motion-curve-tools select {max-width:50%;min-width:0;min-height:22px;padding:1px 5px;font-size:10px;border-radius:5px;}
-#motion-curve-range {white-space:nowrap;color:var(--accent-text);}
-.motion-curve-tools .muted {margin-left:auto;}
-body.motion-open .view-help {display:none;}
-@media(min-width:601px) and (max-width:1000px) {
-  #motion-timeline {right:12px;}
-  .motion-curve-tools .muted {display:none;}
-}
-@media(max-width:600px) {
-  #motion-timeline {left:12px;right:12px;bottom:10px;padding:8px 10px;}
-  body.motion-open .workspace-sidebar,body.motion-open .panel-editor {bottom:186px;height:34%;}
-  body.motion-open .workspace-sidebar.collapsed {height:auto;}
-  .motion-curve-tools .muted {display:none;}
-  .motion-transport {gap:3px;}
-  .motion-transport button {padding:2px 6px;}
-  .motion-transport .motion-field {margin:0;}
-  #motion-time {font-size:10px;}
-  .workspace-tabs [role=tab] {padding:3px 5px;}
-}
-.workspace-content .panel-motion .panel-header h2 {display:block;font-size:12px;}
-
-/* Direct base pose editing stays beside the clicked body, independent of joint dragging. */
-#motion-body-editor {position:fixed;z-index:32;width:288px;max-width:calc(100vw - 24px);padding:12px;border:1px solid var(--focus);border-radius:12px;background:var(--panel);color:var(--text);box-shadow:0 8px 28px var(--shadow);overflow:auto;overscroll-behavior:contain;}
-#motion-body-editor header {display:flex;align-items:center;gap:8px;margin-bottom:6px;}
-#motion-body-editor header strong {font-size:12px;white-space:nowrap;}
-#motion-body-editor header span {font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-#motion-body-close {margin-left:auto;min-height:24px;padding:0 7px;border:0;font-size:19px;}
-#motion-body-editor input {width:100%;min-width:0;padding:5px 6px;}
-#motion-body-editor .motion-field {margin:4px 0;}
-#motion-body-editor p {font-size:10px;line-height:1.6;margin:8px 0;}
-#motion-body-editor .motion-actions {margin:8px 0 0;}
-#motion-body-feedback:empty {display:none;}
-#motion-body-feedback {color:var(--muted);}
-#motion-body-feedback.error {color:#ff9d9d;}
-
-/* Motion contact phases and constrained optimization. */
-.motion-supports {display:flex;flex-wrap:wrap;gap:4px 10px;}
-.motion-supports .motion-field {display:flex;align-items:center;gap:5px;margin:0;font:10px ui-monospace,monospace;}
-.motion-group details summary {cursor:pointer;font-size:11px;color:var(--text);margin:8px 0;}
-.motion-group details .motion-pose-grid {grid-template-columns:repeat(2,minmax(0,1fr));}
-#motion-optimize {background:var(--blue);color:var(--on-accent);}
-
-/* Local whole-body planning controls share the compact motion workspace. */
-.motion-workspace-modes {position:sticky;top:-1px;z-index:1;padding:4px 0 8px;background:var(--panel);}
-.motion-workspace-modes .active,#planner-start {background:var(--blue);color:var(--on-accent);}
-.planner-settings {border:0;padding:0;margin:10px 0;min-width:0;}
-.planner-settings h3 {font-size:12px;margin:14px 0 8px;}
-.planner-settings details {border-top:1px solid var(--line);padding-top:8px;margin-top:10px;}
-.planner-settings summary {font-size:11px;cursor:pointer;margin-bottom:8px;}
-.planner-settings .motion-pose-grid {grid-template-columns:repeat(2,minmax(0,1fr));}
-#planner-progress {width:100%;height:7px;accent-color:var(--blue);margin-top:10px;}
-#planner-progress-detail,#planner-status,.planner-result {font-size:11px;line-height:1.6;overflow-wrap:anywhere;}
-#planner-status.error {color:var(--danger);}
