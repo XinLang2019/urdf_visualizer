@@ -1,0 +1,15 @@
+<mujoco model="two_link_mjcf">
+  <compiler angle="radian"/>
+  <worldbody>
+    <body name="base" pos="0 0 0.8">
+      <inertial mass="2" pos="0 0 0" diaginertia="0.02 0.03 0.04"/>
+      <geom type="box" size="0.2 0.12 0.08" rgba="0.42 0.64 0.78 1"/>
+      <body name="arm" pos="0.2 0 0">
+        <joint name="hinge" type="hinge" axis="0 1 0" range="-1.2 1.2"/>
+        <inertial mass="1" pos="0 0 -0.2" diaginertia="0.02 0.02 0.003"/>
+        <geom type="capsule" size="0.04 0.2" pos="0 0 -0.2" rgba="0.72 0.83 0.91 1"/>
+      </body>
+    </body>
+  </worldbody>
+  <actuator><motor joint="hinge" forcelimited="true" forcerange="-12 12"/></actuator>
+</mujoco>

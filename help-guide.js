@@ -7,7 +7,7 @@
       steps:['加载机器人','调整姿态','测量与分析'],
       cards:[
         {title:'加载与浏览',image:'workbench.png',alt:'Go2 模型、左侧工作栏和右侧代码编辑器',
-          lines:['选择内置示例，或加载含 URDF、网格和纹理的完整文件夹，也可直接拖入。','左侧切换文件 / 关节 / 结构；结构图支持拖动、缩放和右键显隐。']},
+          lines:['选择内置示例，或拖入 URDF / MJCF / USD 完整模型文件夹。MJCF / USD 需要启用格式服务。','左侧切换文件 / 关节 / 结构；结构图支持拖动、缩放和右键显隐。']},
         {title:'关节与辅助显示',image:'joint-control.png',alt:'拖动关节后，在轴旁输入目标关节角度',
           lines:['拖动连杆或关节滑块调姿；点击轴旁数值输入目标角度，自动遵守限位。','双击连杆定位关节与代码；顶部可开启质心、惯量、坐标轴和关节轴。']},
         {title:'两种三维测量',image:'measurement.png',alt:'黄色总距离及红绿蓝 XYZ 分量标注',
@@ -15,6 +15,7 @@
         {title:'静力学与斜坡',image:'slope-statics.png',alt:'四足贴合斜坡，显示关节力矩、机身角度与接触力',
           lines:['调好站姿，开启“受力分析”；点击力矩标签查看力与力臂，再次点击恢复。','设置坡度、坡向和摩擦系数，点击“一键贴合斜坡”，查看机身角度与轮轴力矩。']}
       ],
+      formatsTitle:'三种格式互转',formatsNote:'文件栏选择 URDF / MJCF / USD 后转换下载 ZIP，包含网格和差异说明。MJCF / USD 使用 URDF 工作副本；右侧导出副本包，原文件不覆盖。首次按格式说明安装依赖并用 python3 model_server.py 启动。',
       saveTitle:'编辑与保存',save:'应用代码到模型',write:'保存回源文件',
       saveNote:'编辑器内 Ctrl + S 保存源文件。首次保存可能需要授权，保存后需重新加载以应用修改。',
       controlsTitle:'视图快捷操作',
@@ -27,7 +28,7 @@
       steps:['Load a robot','Set a pose','Measure & analyze'],
       cards:[
         {title:'Load & explore',image:'workbench.png',alt:'Go2 model with the left workspace and right code editor',
-          lines:['Choose an example or load a complete folder with URDF, meshes, and textures. Drag and drop works too.','Switch Files / Joints / Structure on the left. Pan or zoom the graph; right-click a node to toggle visibility.']},
+          lines:['Choose an example or drop a complete URDF / MJCF / USD folder. MJCF / USD requires the format service.','Switch Files / Joints / Structure on the left. Pan or zoom the graph; right-click a node to toggle visibility.']},
         {title:'Joints & visual helpers',image:'joint-control.png',alt:'Enter a target joint angle beside the joint axis',
           lines:['Drag a link or joint slider to pose the robot. Click the axis readout to enter a target within joint limits.','Double-click a link to locate its joint and code. Toggle CoM, inertia, frames, and joint axes in the toolbar.']},
         {title:'Two ways to measure',image:'measurement.png',alt:'Total distance in yellow with red, green, and blue XYZ components',
@@ -35,6 +36,7 @@
         {title:'Statics & slopes',image:'slope-statics.png',alt:'Robot fitted to a slope with joint torques, body attitude, and contact forces',
           lines:['Set a standing pose and enable Statics. Click a torque label for forces and moment arms; click again to restore labels.','Set slope angle, heading, and friction, then Fit supports to slope. Inspect body attitude and wheel holding torques.']}
       ],
+      formatsTitle:'URDF / MJCF / USD conversion',formatsNote:'Choose a target in Files and download a ZIP with meshes and a difference report. Native imports use URDF working copies; Export URDF ZIP retains the native source. Install the format dependencies and start python3 model_server.py.',
       saveTitle:'Edit & save',save:'Apply code to model',write:'Save back to source',
       saveNote:'Ctrl + S saves source in the editor. Saving may need permission. Reload to apply saved code to the model.',
       controlsTitle:'View controls',
@@ -70,6 +72,7 @@
       for(const text of card.lines)body.append(element('p','',text));
       article.append(link,body);grid.append(article);
     });
+    const formats=element('section','help-save');formats.append(element('h3','',guide.formatsTitle),element('p','',guide.formatsNote));const setup=element('a','',language==='zh'?'格式配置与支持范围':'Format setup & support');setup.href='docs/formats.md';setup.target='_blank';setup.rel='noreferrer';formats.append(setup);
     const save=element('section','help-save');save.append(element('h3','',guide.saveTitle));
     const actions=element('div','help-save-actions');
     for(const [key,label]of [['Ctrl + Enter',guide.save],['Ctrl + S',guide.write]]){
@@ -80,7 +83,7 @@
     const list=element('dl');
     for(const [key,value]of guide.controls){const item=element('div');item.append(element('dt','',key),element('dd','',value));list.append(item);}
     controls.append(list);
-    container.replaceChildren(intro,grid,save,controls,element('p','help-note',guide.note));
+    container.replaceChildren(intro,grid,formats,save,controls,element('p','help-note',guide.note));
     document.getElementById('help-footer-hint').textContent=guide.footer;
     document.getElementById('close-help').setAttribute('aria-label',guide.close);
   };

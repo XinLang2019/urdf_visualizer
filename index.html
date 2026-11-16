@@ -31,7 +31,13 @@
       <div class="import-area"><div class="upload-icon" aria-hidden="true">↥</div><p data-i18n="dropHint">拖拽机器人模型文件或文件夹到页面任意位置</p><p class="muted" data-i18n="orLoad">或点击下面的按钮加载</p><div class="button-row"><button id="load-files" data-i18n="loadFile">加载文件</button><button id="load-folder" data-i18n="loadFolder">加载文件夹</button></div></div>
       <div id="file-tree" role="tree" aria-label="模型文件目录" hidden></div>
       <div id="loaded-file" hidden><span class="file-symbol">◇</span><div><strong id="model-name"></strong><span id="model-meta" class="muted"></span></div><span class="loaded-dot" title="已加载"></span></div>
-      <div class="example-section"><label for="example-select" data-i18n="examples">内置示例</label><div class="example-row"><select id="example-select" aria-label="选择示例模型"><option value="" data-i18n="chooseModel">选择机器人模型…</option><option value="urdf/anymal_c/urdf/anymal_c.urdf">ANYmal C</option><option value="urdf/anymal_b/urdf/anymal_b.urdf">ANYmal B</option><option value="urdf/go2/urdf/go2.urdf">Unitree Go2</option><option value="urdf/g1/urdf/g1.urdf" data-base="../">Unitree G1</option><option value="urdf/cassie/urdf/cassie.urdf">Cassie</option></select><button id="load-example" data-i18n="load">加载</button></div></div>
+      <div class="example-section"><label for="example-select" data-i18n="examples">内置示例</label><div class="example-row"><select id="example-select" aria-label="选择示例模型"><option value="" data-i18n="chooseModel">选择机器人模型…</option><option value="urdf/anymal_c/urdf/anymal_c.urdf">ANYmal C</option><option value="urdf/anymal_b/urdf/anymal_b.urdf">ANYmal B</option><option value="urdf/go2/urdf/go2.urdf">Unitree Go2</option><option value="urdf/g1/urdf/g1.urdf" data-base="../">Unitree G1</option><option value="urdf/cassie/urdf/cassie.urdf">Cassie</option><option value="examples/formats/two-link.xml">MJCF · Two-link</option><option value="examples/formats/two-link.usda">USD · Two-link</option></select><button id="load-example" data-i18n="load">加载</button></div></div>
+      <section class="format-tools" aria-labelledby="format-tools-title"><h3 id="format-tools-title" data-i18n="formatConvert">格式转换</h3>
+        <p id="model-format-info" class="muted" hidden></p>
+        <div class="format-row"><select id="conversion-target" aria-label="转换目标格式"><option value="urdf">URDF (.urdf)</option><option value="mjcf" selected>MJCF (.xml)</option><option value="usd">USD (.usd)</option></select><button id="convert-model" data-i18n="convertDownload" disabled>转换并下载</button></div>
+        <p id="conversion-status" class="muted" role="status"></p><details id="conversion-report" hidden><summary data-i18n="conversionDetails">转换说明</summary><p id="conversion-report-text"></p></details>
+        <p class="format-service-hint muted"><span data-i18n="formatServiceHint">MJCF / USD 加载和格式转换需要格式服务。</span> <a href="docs/formats.md" target="_blank" rel="noreferrer" data-i18n="formatSetup">配置与支持范围</a></p>
+      </section>
     </div>
   </aside>
   <aside id="joints-panel" class="panel panel-joints" role="tabpanel" aria-labelledby="tab-joints" hidden>
@@ -80,7 +86,7 @@
       <details><summary data-i18n="staticsAssumptions">计算假设与数据</summary><p id="statics-method" class="muted"></p><p id="statics-mass-note" class="muted"></p><p class="statics-equation">ΣF = 0 · ΣM = 0<br>τ = −a · Σ(r × F)</p><p class="muted"><a href="https://modernrobotics.northwestern.edu/nu-gm-book-resource/5-2-statics-of-open-chains/" target="_blank" rel="noreferrer">Modern Robotics · Statics</a></p></details>
     </section>
   </aside>
-  <div id="drop-overlay" hidden><div>↥<strong data-i18n="release">松开以加载机器人模型</strong><span>URDF / XML + STL / DAE / OBJ / GLTF</span></div></div>
+  <div id="drop-overlay" hidden><div>↥<strong data-i18n="release">松开以加载机器人模型</strong><span>URDF / MJCF / USD + meshes</span></div></div>
   <div id="status" role="status" aria-live="polite"><span class="status-dot"></span><span id="status-text" data-i18n="ready">就绪 · 加载模型以开始</span></div>
   <svg id="statics-overlay" aria-hidden="true" hidden></svg><div id="statics-labels" hidden></div>
   <svg id="link-measure-overlay" aria-hidden="true" hidden></svg>
@@ -97,8 +103,8 @@
     <p data-i18n="surfaceMeasureBasis">场景坐标 · B − A · Shift 选点 · Alt 暂停吸附</p>
   </section>
   <footer class="view-help"><span><b data-i18n="leftDrag">左键拖动</b> <span data-i18n="rotate">旋转视角</span></span><span><b data-i18n="rightDrag">右键拖动</b> <span data-i18n="pan">平移视角</span></span><span><b data-i18n="wheel">滚轮</b> <span data-i18n="zoom">缩放视图</span></span><span><b>F</b> <span data-i18n="fit">适应视图</span></span><span><b>Shift + 点击</b> <span data-i18n="measure">两点测量</span></span><span><b>Ctrl + 点击</b> <span data-i18n="linkMeasureAction">连杆测量</span></span></footer>
-  <input id="file-input" type="file" accept=".urdf,.xml,.stl,.dae,.obj,.gltf,.glb,.bin,.png,.jpg,.jpeg,.webp" multiple hidden><input id="folder-input" type="file" webkitdirectory multiple hidden>
+  <input id="file-input" type="file" accept=".urdf,.xml,.mjcf,.usd,.usda,.usdc,.usdz,.stl,.dae,.obj,.gltf,.glb,.bin,.png,.jpg,.jpeg,.webp" multiple hidden><input id="folder-input" type="file" webkitdirectory multiple hidden>
   <dialog id="help-dialog" aria-labelledby="help-title"><div class="dialog-header"><div class="help-heading"><img src="assets/robot.svg" width="42" height="42" alt=""><div><span class="help-brand">URDF-Viewer</span><h2 id="help-title" data-i18n="helpTitle">使用指南</h2></div></div><button id="close-help" type="button" aria-label="关闭帮助" autofocus>×</button></div><div id="help-content"></div><footer class="help-footer"><span id="help-footer-hint"></span><button id="restore-layout" data-i18n="restoreLayout">恢复面板布局</button></footer></dialog>
-  <script src="src.a2b27638.js"></script><script src="measurement-features.js"></script><script src="statics-core.js"></script><script src="statics-contacts.js"></script><script src="statics-annotations.js"></script><script src="statics-terrain.js"></script><script src="statics-workbench.js"></script><script src="source-files.js"></script><script src="help-guide.js"></script><script src="workbench.js"></script>
+  <script src="src.a2b27638.js"></script><script src="measurement-features.js"></script><script src="statics-core.js"></script><script src="statics-contacts.js"></script><script src="statics-annotations.js"></script><script src="statics-terrain.js"></script><script src="statics-workbench.js"></script><script src="source-files.js"></script><script src="help-guide.js"></script><script src="model-formats.js"></script><script src="workbench.js"></script>
 </body>
 </html>

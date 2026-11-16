@@ -43,6 +43,20 @@
     loadFile:['加载文件','Load files'],
     loadFolder:['加载文件夹','Load folder'],
     examples:['内置示例','EXAMPLE MODELS'],
+    formatConvert:['格式转换','Convert format'],
+    convertDownload:['转换并下载','Convert & download'],
+    conversionDetails:['转换说明','Conversion details'],
+    formatServiceHint:['MJCF / USD 加载和格式转换需要格式服务。','MJCF / USD loading and conversion require the format service.'],
+    formatSetup:['配置与支持范围','Setup & support'],
+    formatsServiceRequired:['请使用 python3 model_server.py 启动工作台，并安装 requirements-formats.txt 中的依赖。普通静态服务仅支持 URDF。','Start the workbench with python3 model_server.py and install requirements-formats.txt. Ordinary static hosting supports URDF only.'],
+    formatsTimeout:['模型转换超时，请简化模型或拆分资源后重试','Model conversion timed out. Simplify or split the model and retry.'],
+    unsupportedModel:['请选择 URDF <robot>、MJCF <mujoco> 或 USD 模型','Choose a URDF <robot>, MJCF <mujoco>, or USD model'],
+    loadCompleteFolder:['请加载包含模型及其网格、引用文件的完整文件夹','Load the complete model folder, including meshes and referenced files'],
+    converting:['正在转换模型并打包资源…','Converting the model and packing resources…'],
+    conversionDone:['转换完成，已下载含资源与转换说明的 ZIP','Converted. Downloaded a ZIP with resources and conversion notes'],
+    workingCopy:['URDF 工作副本；导出会打包网格，原文件保持不变。','URDF working copy. Export packages meshes; the original is retained.'],
+    exportWorkingCopy:['导出 URDF 包','Export URDF ZIP'],
+    copyExported:['副本已导出','Copy exported'],
     chooseModel:['选择机器人模型…','Choose a robot…'],
     load:['加载','Load'],
     radians:['弧度','Rad'],
@@ -115,7 +129,7 @@
     localServerIntro:['当前通过 file:// 打开。内置示例需要通过 HTTP 加载，请在项目目录运行：','Opened via file://. Bundled examples require HTTP. Run in the project directory:'],
     localServerOpen:['打开本地工作台 →','Open the local workbench →'],
     localServerRequired:['file:// 无法读取内置模型资源。请在项目目录运行 python3 -m http.server 8080，然后打开 http://localhost:8080/','file:// cannot fetch bundled model resources. Run python3 -m http.server 8080 in the project directory, then open http://localhost:8080/'],
-    noUrdf:['未找到 URDF / XML 文件，请选择包含模型的文件夹','No URDF / XML found. Choose a folder containing a robot model.'],
+    noUrdf:['未找到 URDF / MJCF / USD 模型，请选择完整模型文件夹','No URDF / MJCF / USD model found. Choose the complete model folder.'],
     pickSecond:['已选第一个点，请 Shift + 点击第二个点','First point selected. Shift + click a second point.'],
     emptySource:['请先加载模型或在编辑器中输入 URDF','Load a model or enter URDF in the editor first'],
     unsaved:['有未处理的编辑；请先保存或重新加载，再切换模型','Save or apply your edits before switching models'],
@@ -142,6 +156,8 @@
   const t = key => strings[key]?.[lang === 'zh' ? 0 : 1] || key;
   const state = { display:{visual:true,collision:false,inertia:false,com:false,axes:false,jointAxes:false,shadow:true,lighting:true,grid:true}, radians:true, limits:true, source:'', baseline:'', saving:false, context:null, version:0, selected:null, rows:new Map(), helpers:[], mobile:'files', activeTab:'files', sidebarCollapsed:false, editorOpen:innerWidth>1000 };
   const sourceFiles=new URDFSourceFiles(t);
+  const modelFormats=new URDFModelFormats(t);
+  let conversionBusy=false;
   // Keep initialization failures visible even when WebGL is unavailable.
   let THREE, viewer, grid;
   let activeDragJoint=null,statics=null;
@@ -265,7 +281,7 @@
     else if(['gltf','glb'].includes(extension))new loaders.GLTFLoader(manager).load(path,result=>finish(result.scene),undefined,onError);
     else {manager.itemError(path);finish(null,new Error(`Unsupported mesh: ${extension}`));}
   }
-  function hasEdits() { return state.saving || ($('source').value!==state.baseline && $('source').value!==state.context?.sourceFile?.savedText); }
+  function hasEdits() { return state.saving || ($('source').value!==state.baseline && $('source').value!==state.context?.sourceFile?.savedText && $('source').value!==state.context?.sourceFile?.exportedText); }
   async function loadText(text, context, {replaceEditor=true}={}) {
     text=text.replace(/\r\n?/g,'\n');
     const xml=validate(text);
@@ -309,9 +325,24 @@
     $('structure-count').hidden=false;$('structure-count').textContent=`${linkCount} / ${jointCount}`;
     $('graph-measure').disabled=false;
     buildHierarchy();buildFileTree();buildJoints();buildTree();buildHelpers();applyDisplay();fitView();updateEditor();statics?.modelChanged();
+    updateFormatInfo(context);
     if(failures.size){status(`${t('meshMissing')} · ${failures.size}`, 'error');$('editor-error').textContent=`${t('meshMissing')}: ${[...failures].map(p=>decodeURIComponent(p)).join('\n')}`;$('editor-error').hidden=false;}
     else status(`${t('modelLoaded')} · ${context.name}`);
     return true;
+  }
+  function showConversionReport(report) {
+    const notes=report?.warnings || [];
+    $('conversion-report').hidden=!notes.length;
+    $('conversion-report-text').textContent=notes.join('\n\n');
+  }
+  function updateFormatInfo(context,withReport=true) {
+    const info=$('model-format-info');info.hidden=!context?.originalFormat;
+    info.textContent=context?.originalFormat?`${context.originalFormat.toUpperCase()} · ${context.originalName} → ${t('workingCopy')}`:'';
+    if(withReport)showConversionReport(context?.formatReport);
+  }
+  async function nativeContext(file,context) {
+    const prepared=await modelFormats.prepare(file,context);
+    return prepared.context.originalFormat?{...prepared.context,workingText:prepared.text}:prepared.context;
   }
   let catalogPromise;
   async function loadExample() {
@@ -327,6 +358,13 @@
       const url=new URL(path,location.href);
       const response=await fetch(url,{cache:'no-store'});
       if(!response.ok)throw new Error(`HTTP ${response.status}`);
+      if(!/\.urdf$/i.test(path)) {
+        const file=new File([await response.blob()],path.split('/').pop()),assets=new Map([[path,sourceFiles.fromFile(file)]]);
+        const context=await nativeContext(file,{name:file.name,path,assets,base:new URL(`/__local__/${path.slice(0,path.lastIndexOf('/')+1)}`,location.href).href});
+        if(version!==state.version){releaseContext(context);return;}
+        viewer.up='+Z';$('up-select').value='+Z';
+        await loadText(context.workingText || await file.text(),context);return;
+      }
       const text=await response.text();
       if(version!==state.version)return;
       catalogPromise ||= fetch(new URL('urdf/catalog.json',location.href)).then(response=>response.ok?response.json():{}).catch(()=>({}));
@@ -338,7 +376,11 @@
     }
   }
   async function chooseUrdf(files) {
-    const candidates=files.filter(file=>/\.(urdf|xml)$/i.test(file.name)).sort((a,b)=>a.name.localeCompare(b.name));
+    const candidates=[];
+    for(const file of files.filter(file=>URDFModelFormats.isModel(file.name))) {
+      if(!/\.xml$/i.test(file.name)||await URDFModelFormats.detect(file))candidates.push(file);
+    }
+    candidates.sort((a,b)=>a.name.localeCompare(b.name));
     if(!candidates.length)throw new Error(t('noUrdf'));
     if(candidates.length===1)return candidates[0];
     const dialog=document.createElement('dialog'), heading=document.createElement('h3');heading.textContent=t('fileChoice');dialog.append(heading);
@@ -349,10 +391,16 @@
     let context;
     try {
       const file=await chooseUrdf(files);if(!file)return;
+      const version=++state.version,editorBefore=$('source').value;
+      status(t('loading'),'loading');
       const assets=new Map(files.map(file=>[normalize(file.webkitRelativePath || file._relativePath || file.name),sourceFiles.fromFile(file)]));
       const path=normalize(file.webkitRelativePath || file._relativePath || file.name);
       context={name:file.name,path,assets,sourceFile:assets.get(path),base:new URL(`/__local__/${path.slice(0,path.lastIndexOf('/')+1)}`,location.href).href};
-      const loaded=await loadText(await sourceFiles.read(context.sourceFile),context);if(!loaded)releaseContext(context);
+      context=await nativeContext(file,context);
+      if(version!==state.version){releaseContext(context);return;}
+      if($('source').value!==editorBefore)throw Error(t('unsaved'));
+      if(context.originalFormat){viewer.up='+Z';$('up-select').value='+Z';}
+      const loaded=await loadText(context.workingText || await sourceFiles.read(context.sourceFile),context);if(!loaded)releaseContext(context);
     }catch(error){if(context!==state.context)releaseContext(context);fail(error);}
   }
   async function readEntry(entry, prefix='') {
@@ -408,7 +456,11 @@
     const context=sourceContext(path,state.context);
     try {
       let text;
-      if(context.assets)text=await sourceFiles.read(context.sourceFile);
+      if(context.assets) {
+        const prepared=await nativeContext(context.sourceFile.file,context);
+        if(prepared.originalFormat){viewer.up='+Z';$('up-select').value='+Z';return await loadText(prepared.workingText,prepared);}
+        text=await sourceFiles.read(context.sourceFile);
+      }
       else {
         const url=new URL(`urdf/${path}`,location.href);
         const response=await fetch(url,{cache:'no-store'});
@@ -420,7 +472,7 @@
   }
   function buildFileTree() {
     const context=state.context, active=filePath(context);
-    const paths=context.assets?[...context.assets.keys()]:(context.files || [active]);
+    const paths=context.assets?[...context.assets.keys()].filter(path=>!path.split('/').includes('__converted__')):(context.files || [active]);
     const root={children:new Map()};
     for(const path of paths) {
       let parent=root;
@@ -444,14 +496,14 @@
           const name=document.createElement('span');name.textContent=entry.name;
           summary.append(icon,name);folder.append(summary);parent.append(folder);append(entry,folder,depth+1);
         }else{
-          const isRobot=/\.(urdf|xml)$/i.test(entry.name);
+          const isRobot=URDFModelFormats.isModel(entry.name);
           const row=document.createElement(isRobot?'button':'div');
           row.className='file-entry';row.dataset.path=entry.path;row.setAttribute('role','treeitem');
           row.setAttribute('aria-selected',String(entry.path===active));row.classList.toggle('selected',entry.path===active);
           row.title=entry.path;
           const icon=document.createElement('span');icon.className='file-entry-icon';icon.textContent=isRobot?'▤':'◇';
           const name=document.createElement('span');name.className='file-entry-name';name.textContent=entry.name;
-          const type=document.createElement('span');type.className='file-entry-type';type.textContent=isRobot?'URDF':entry.name.split('.').pop().toUpperCase();
+          const type=document.createElement('span');type.className='file-entry-type';type.textContent=entry.name.split('.').pop().toUpperCase();
           row.append(icon,name,type);if(isRobot)row.onclick=()=>openTreeFile(entry.path);parent.append(row);
         }
       }
@@ -1568,16 +1620,27 @@
     const text=$('source').value;highlightSource(text);
     const lineCount=text.split('\n').length;$('line-numbers').textContent=Array.from({length:lineCount},(_,i)=>i+1).join('\n');$('line-numbers').scrollTop=$('source').scrollTop;
     const before=text.slice(0,$('source').selectionStart),line=before.split('\n').length,column=before.length-before.lastIndexOf('\n');$('cursor-position').textContent=`Ln ${line}, Col ${column}`;
-    const source=state.context?.sourceFile,saved=text===source?.savedText,applied=text===state.baseline;
-    $('save-state').classList.toggle('dirty',!saved&&!!text);$('save-state').removeAttribute('data-i18n');
-    $('save-state').textContent=state.saving?t('saving'):!text?t('emptyFile'):saved?(source.written?(applied?t('saved'):t('savedUnapplied')):t('applied')):applied?t('appliedUnsaved'):t('modified');
+    const source=state.context?.sourceFile,saved=text===source?.savedText,exported=text===source?.exportedText,applied=text===state.baseline;
+    $('save-state').classList.toggle('dirty',!saved&&!exported&&!!text);$('save-state').removeAttribute('data-i18n');
+    $('save-state').textContent=state.saving?t('saving'):!text?t('emptyFile'):exported?t('copyExported'):saved?(source.written?(applied?t('saved'):t('savedUnapplied')):t('applied')):applied?t('appliedUnsaved'):t('modified');
     $('filename').readOnly=!!source&&source.savedText!==null;
     $('reload').disabled=state.saving||!text.trim();$('save').disabled=state.saving||!text.trim();
-    $('save').textContent=t(state.saving?'saving':'save');
+    $('convert-model').disabled=conversionBusy||state.saving||!text.trim();
+    $('save').textContent=t(state.saving?'saving':state.context?.originalFormat?'exportWorkingCopy':'save');
     $('save').title=source&&source.savedText!==null&&!source.handle?`${t('chooseSource')}: ${source.name}`:'Ctrl + S';
   }
   $('source').oninput=()=>{cancelLinkNavigation();$('editor-error').hidden=true;updateEditor();};$('source').onscroll=syncEditorScroll;$('source').onkeyup=updateEditor;$('source').onclick=updateEditor;
   $('source').onkeydown=event=>{if(event.key==='Tab'){event.preventDefault();const source=$('source');source.setRangeText('  ',source.selectionStart,source.selectionEnd,'end');source.dispatchEvent(new Event('input'));}};
+  $('convert-model').onclick=async()=>{
+    if(conversionBusy)return;
+    conversionBusy=true;updateEditor();$('conversion-status').textContent=t('converting');$('conversion-status').classList.remove('error');
+    try {
+      const text=$('source').value;validate(text);
+      const report=await modelFormats.convert(text,state.context||{name:$('filename').value||'model.urdf',base:new URL('.',location.href).href},$('conversion-target').value);
+      showConversionReport(report);$('conversion-status').textContent=t('conversionDone');
+    }catch(error){$('conversion-status').textContent=error.message||String(error);$('conversion-status').classList.add('error');}
+    finally{conversionBusy=false;updateEditor();}
+  };
   $('reload').onclick=async()=>{if(state.saving)return;try{await loadText($('source').value,state.context||{name:$('filename').value||'newfile.urdf',base:new URL('.',location.href).href},{replaceEditor:false});}catch(error){fail(error);}};
   $('save').onclick=async()=>{
     const text=$('source').value;if(state.saving||!text.trim())return;
@@ -1585,6 +1648,9 @@
     state.saving=true;$('editor-error').hidden=true;updateEditor();
     try {
       validate(text);
+      if(context?.originalFormat){
+        const report=await modelFormats.convert(text,context,'urdf');showConversionReport(report);source.exportedText=text;status(t('conversionDone'));return;
+      }
       let name=$('filename').value.trim().replace(/[\\/:*?"<>|]/g,'_')||'robot.urdf';if(!/\.(urdf|xml)$/i.test(name))name+='.urdf';
       await sourceFiles.save(source,text,name);
       if(context){context.sourceFile=source;context.name=source.name;}
@@ -1718,7 +1784,7 @@
   });
   statics=createStaticsWorkbench({THREE,viewer,grid,refreshScene:()=>{queueLinkMeasurementUpdate();queueJointAngleUpdate();fitView();},getModel:()=>({xml:state.xml,version:state.version}),getLanguage:()=>lang,openRight:()=>setPanel('editor',true),refreshAxes:refreshJointAngleAxis,project:projectMeasurementPoint});
   $('help').onclick=()=>{$('help-dialog').showModal();$('help-content').scrollTop=0;};$('close-help').onclick=()=>$('help-dialog').close();
-  function translate(){document.documentElement.lang=lang==='zh'?'zh-CN':'en';$$('[data-i18n]').forEach(el=>el.textContent=t(el.dataset.i18n));$('language').textContent=lang==='zh'?'EN':'中文';$('joint-search').placeholder=lang==='zh'?'搜索关节…':'Search joints…';renderURDFHelp($('help-content'),lang);updateEditor();filterJoints();refreshWorkspace();statics?.languageChanged();updateLinkMeasureUI();updateLinkMeasurement();if(surfaceSnap.pointer)renderSurfaceSnap();if(viewer.robot){$('model-meta').textContent=`${Object.keys(viewer.robot.links).length} ${t('linkTotal')} · ${Object.keys(viewer.robot.joints).length} ${t('jointTotal')}`;}}
+  function translate(){document.documentElement.lang=lang==='zh'?'zh-CN':'en';$$('[data-i18n]').forEach(el=>el.textContent=t(el.dataset.i18n));$('language').textContent=lang==='zh'?'EN':'中文';$('joint-search').placeholder=lang==='zh'?'搜索关节…':'Search joints…';renderURDFHelp($('help-content'),lang);updateFormatInfo(state.context,false);updateEditor();filterJoints();refreshWorkspace();statics?.languageChanged();updateLinkMeasureUI();updateLinkMeasurement();if(surfaceSnap.pointer)renderSurfaceSnap();if(viewer.robot){$('model-meta').textContent=`${Object.keys(viewer.robot.links).length} ${t('linkTotal')} · ${Object.keys(viewer.robot.joints).length} ${t('jointTotal')}`;}}
   $('language').onclick=()=>{lang=lang==='zh'?'en':'zh';translate();};
   $('theme').onclick=()=>{const light=document.body.classList.toggle('light');$('theme').textContent=light?'☀':'☾';document.querySelector('meta[name="theme-color"]').content=light?'#E8F0F8':'#2E6B8A';grid.material.color.set(light?0x2e6b8a:0x6ba3c8);grid.material.opacity=light?.26:.32;viewer.redraw();};
   translate();

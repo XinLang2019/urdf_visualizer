@@ -29,7 +29,7 @@
       return (await Promise.all(pending)).flat();
     }
     async pickFiles() {
-      const handles=await window.showOpenFilePicker({multiple:true,types:[{description:'URDF / XML / meshes / textures',accept:{'application/octet-stream':['.urdf','.xml','.stl','.dae','.obj','.gltf','.glb','.bin','.png','.jpg','.jpeg','.webp']}}],excludeAcceptAllOption:false});
+      const handles=await window.showOpenFilePicker({multiple:true,types:[{description:'URDF / MJCF / USD / meshes / textures',accept:{'application/octet-stream':['.urdf','.xml','.mjcf','.usd','.usda','.usdc','.usdz','.stl','.dae','.obj','.gltf','.glb','.bin','.png','.jpg','.jpeg','.webp']}}],excludeAcceptAllOption:false});
       return (await Promise.all(handles.map(handle=>this.readHandle(handle)))).flat();
     }
     async pickDirectory() {return this.readHandle(await window.showDirectoryPicker({id:'urdf-models'}));}

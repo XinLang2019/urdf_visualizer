@@ -1,0 +1,7 @@
+# Optional native format readers / converters (Python 3.10+).
+numpy>=1.26
+scipy>=1.11
+mujoco>=3.2
+usd-core>=24.5
+trimesh>=4.4
+pycollada>=0.8
