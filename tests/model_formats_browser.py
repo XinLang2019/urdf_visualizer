@@ -68,7 +68,7 @@ def run(client,url,output):
     client.call('Page.navigate',{'url':url if BROWSER_FORMATS else url+'?formats=native'});client.until('!!window.urdfWorkbench')
     client.js('''window.formatDownloads=[];window.formatClick=HTMLAnchorElement.prototype.click;HTMLAnchorElement.prototype.click=function(){if(this.download){const name=this.download;fetch(this.href).then(r=>r.blob()).then(blob=>new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.readAsDataURL(blob);})).then(data=>formatDownloads.push({name,data}));}else formatClick.call(this)}''')
     import_files(client,{'original.urdf':URDF},'format_fixture')
-    smoke.check(client,'document.getElementById("model-format-info").hidden','ordinary URDF source remains the editable original')
+    smoke.check(client,'document.getElementById("filename").value==="original.urdf"','ordinary URDF source remains the editable original')
     native={}
     for target in ['mjcf','usd']:
         package,report=convert(client,target);native[target]=package
@@ -77,7 +77,7 @@ def run(client,url,output):
         if BROWSER_FORMATS:verify_browser_package(package)
     for source,package in native.items():
         import_files(client,package,'format_fixture')
-        smoke.check(client,'!document.getElementById("model-format-info").hidden && document.getElementById("filename").value.endsWith(".viewer.urdf") && document.getElementById("save-state").textContent.includes("未保存")','native '+source.upper()+' exposes an explicit URDF working copy instead of overwriting the source')
+        smoke.check(client,'document.getElementById("filename").value.endsWith(".viewer.urdf") && document.getElementById("save-state").textContent.includes("未保存")','native '+source.upper()+' exposes an explicit URDF working copy instead of overwriting the source')
         smoke.check(client,'Math.abs(urdfWorkbench.viewer.robot.joints.hinge.limit.lower+1)<1e-5 && Math.abs(urdfWorkbench.viewer.robot.joints.hinge.limit.upper-1.2)<1e-5','native '+source.upper()+' retains signed radian limits')
         client.js('(()=>{document.getElementById("tab-joints").click();const slider=document.querySelector("#joint-list li[data-name=hinge] input[type=range]");slider.value=.4;slider.dispatchEvent(new Event("input"));})()')
         smoke.check(client,'Math.abs(urdfWorkbench.viewer.robot.joints.hinge.angle-.4)<1e-7','native '+source.upper()+' supports existing joint controls')

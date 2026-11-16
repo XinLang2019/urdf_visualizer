@@ -33,10 +33,8 @@
       <div id="loaded-file" hidden><span class="file-symbol">◇</span><div><strong id="model-name"></strong><span id="model-meta" class="muted"></span></div><span class="loaded-dot" title="已加载"></span></div>
       <div class="example-section"><label for="example-select" data-i18n="examples">内置示例</label><div class="example-row"><select id="example-select" aria-label="选择示例模型"><option value="" data-i18n="chooseModel">选择机器人模型…</option><option value="urdf/anymal_c/urdf/anymal_c.urdf">ANYmal C</option><option value="urdf/anymal_b/urdf/anymal_b.urdf">ANYmal B</option><option value="urdf/go2/urdf/go2.urdf">Unitree Go2</option><option value="urdf/g1/urdf/g1.urdf" data-base="../">Unitree G1</option><option value="urdf/cassie/urdf/cassie.urdf">Cassie</option><option value="examples/formats/two-link.xml">MJCF · Two-link</option><option value="examples/formats/two-link.usda">USD · Two-link</option></select><button id="load-example" data-i18n="load">加载</button></div></div>
       <section class="format-tools" aria-labelledby="format-tools-title"><h3 id="format-tools-title" data-i18n="formatConvert">格式转换</h3>
-        <p id="model-format-info" class="muted" hidden></p>
         <div class="format-row"><select id="conversion-target" aria-label="转换目标格式"><option value="urdf">URDF (.urdf)</option><option value="mjcf" selected>MJCF (.xml)</option><option value="usd">USD (.usda)</option></select><button id="convert-model" data-i18n="convertDownload" disabled>转换并下载</button></div>
-        <p id="conversion-status" class="muted" role="status"></p><details id="conversion-report" hidden><summary data-i18n="conversionDetails">转换说明</summary><p id="conversion-report-text"></p></details>
-        <p class="format-service-hint muted"><span data-i18n="formatServiceHint">浏览器本地处理 URDF / MJCF / 文本 USDA，无需 Python，不上传模型。</span> <a href="docs/formats.md" target="_blank" rel="noreferrer" data-i18n="formatSetup">使用与支持范围</a></p>
+        <p id="conversion-status" class="muted" role="status"></p>
       </section>
     </div>
   </aside>

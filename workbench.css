@@ -1698,8 +1698,4 @@ body.light #link-measure-dz,body.light #surface-measure-dz {
 .format-row button {font-size:11px;white-space:nowrap;padding:5px 8px;}
 .format-tools p {font-size:10px;line-height:1.7;overflow-wrap:anywhere;}
 .format-tools p:empty {display:none;}
-.format-tools a {color:var(--blue);}
 #conversion-status.error {color:var(--danger);}
-#conversion-report {font-size:10px;line-height:1.6;}
-#conversion-report summary {cursor:pointer;}
-#conversion-report-text {white-space:pre-line;max-height:180px;overflow:auto;}
