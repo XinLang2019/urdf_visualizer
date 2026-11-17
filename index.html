@@ -36,6 +36,7 @@
         <div class="format-row"><select id="conversion-target" aria-label="转换目标格式"><option value="urdf">URDF (.urdf)</option><option value="mjcf" selected>MJCF (.xml)</option><option value="usd">USD (.usda)</option></select><button id="convert-model" data-i18n="convertDownload" disabled>转换并下载</button></div>
         <p id="conversion-status" class="muted" role="status"></p>
       </section>
+      <section class="mesh-tools" aria-labelledby="mesh-tools-title"><h3 id="mesh-tools-title">Mesh Simplifier</h3><div class="format-row"><select id="mesh-source" aria-label="选择 STL / OBJ 网格" disabled></select><button id="mesh-open" data-mesh-i18n="open" disabled>简化…</button></div></section>
     </div>
   </aside>
   <aside id="joints-panel" class="panel panel-joints" role="tabpanel" aria-labelledby="tab-joints" hidden>
@@ -102,7 +103,21 @@
   </section>
   <footer class="view-help"><span><b data-i18n="leftDrag">左键拖动</b> <span data-i18n="rotate">旋转视角</span></span><span><b data-i18n="rightDrag">右键拖动</b> <span data-i18n="pan">平移视角</span></span><span><b data-i18n="wheel">滚轮</b> <span data-i18n="zoom">缩放视图</span></span><span><b>F</b> <span data-i18n="fit">适应视图</span></span><span><b>Shift + 点击</b> <span data-i18n="measure">两点测量</span></span><span><b>Ctrl + 点击</b> <span data-i18n="linkMeasureAction">连杆测量</span></span></footer>
   <input id="file-input" type="file" accept=".urdf,.xml,.mjcf,.usd,.usda,.usdc,.usdz,.stl,.dae,.obj,.gltf,.glb,.bin,.png,.jpg,.jpeg,.webp" multiple hidden><input id="folder-input" type="file" webkitdirectory multiple hidden>
+  <dialog id="mesh-dialog" aria-labelledby="mesh-dialog-title">
+    <header class="dialog-header"><div><h2 id="mesh-dialog-title">Mesh Simplifier</h2><p id="mesh-name"></p></div><button id="mesh-close" type="button" aria-label="关闭网格简化">×</button></header>
+    <div class="mesh-settings">
+      <label class="mesh-ratio-control"><span data-mesh-i18n="retain">保留面数</span><input id="mesh-ratio" type="range" min="1" max="99" value="50"><output id="mesh-ratio-value">50%</output></label>
+      <label><span data-mesh-i18n="target">目标面数</span><input id="mesh-target" type="number" min="1" step="1"></label>
+      <label><span data-mesh-i18n="error">最大误差 (%)</span><input id="mesh-error" type="number" min="0" max="100" step="0.1" value="1"></label>
+      <label class="mesh-check"><input id="mesh-border" type="checkbox" checked><span data-mesh-i18n="border">保留边界</span></label>
+      <label class="mesh-check"><input id="mesh-wireframe" type="checkbox"><span data-mesh-i18n="wireframe">线框</span></label>
+      <button id="mesh-run" class="active" data-mesh-i18n="run" disabled>开始简化</button>
+    </div>
+    <div class="mesh-comparison-head"><div><strong data-mesh-i18n="original">原始</strong><span id="mesh-before-count">—</span></div><div><strong data-mesh-i18n="result">简化后</strong><span id="mesh-after-count">—</span><b id="mesh-reduction"></b></div></div>
+    <div id="mesh-preview"><canvas id="mesh-canvas" aria-label="原始网格与简化网格对比，拖动旋转，滚轮缩放"></canvas></div>
+    <footer class="mesh-footer"><div class="mesh-feedback"><progress id="mesh-progress" max="1" value="0" hidden></progress><p id="mesh-status" role="status"></p><p id="mesh-note"></p></div><div class="button-row"><button id="mesh-overwrite" data-mesh-i18n="overwrite" disabled>覆盖源文件</button><button id="mesh-download" class="active" data-mesh-i18n="download" disabled>下载</button></div></footer>
+  </dialog>
   <dialog id="help-dialog" aria-labelledby="help-title"><div class="dialog-header"><div class="help-heading"><img src="assets/robot.svg" width="42" height="42" alt=""><div><span class="help-brand">URDF-Viewer</span><h2 id="help-title" data-i18n="helpTitle">使用指南</h2></div></div><button id="close-help" type="button" aria-label="关闭帮助" autofocus>×</button></div><div id="help-content"></div><footer class="help-footer"><span id="help-footer-hint"></span><button id="restore-layout" data-i18n="restoreLayout">恢复面板布局</button></footer></dialog>
-  <script src="src.a2b27638.js"></script><script src="measurement-features.js"></script><script src="statics-core.js"></script><script src="statics-contacts.js"></script><script src="statics-annotations.js"></script><script src="statics-terrain.js"></script><script src="statics-workbench.js"></script><script src="source-files.js"></script><script src="help-guide.js"></script><script src="browser-model-formats.js"></script><script src="model-formats.js"></script><script src="workbench.js"></script>
+  <script src="src.a2b27638.js"></script><script src="measurement-features.js"></script><script src="statics-core.js"></script><script src="statics-contacts.js"></script><script src="statics-annotations.js"></script><script src="statics-terrain.js"></script><script src="statics-workbench.js"></script><script src="source-files.js"></script><script src="help-guide.js"></script><script src="browser-model-formats.js"></script><script src="model-formats.js"></script><script src="mesh-simplifier.js"></script><script src="workbench.js"></script>
 </body>
 </html>

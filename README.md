@@ -24,6 +24,7 @@ GitHub Pages 与普通静态服务可直接加载 URDF / MJCF / 文本 USDA 并�
 
 - **模型与结构**：URDF、MJCF、USD 文件 / 文件夹导入、拖拽加载、结构拓扑；内置机器人及 MJCF / USD 示例。
 - **格式转换**：URDF ↔ MJCF ↔ USD，打包网格下载，附转换差异说明；在线版 USD 导出为文本 `.usda`。[使用方法](docs/formats.md)。
+- **Mesh Simplifier**：选择已加载的 STL / OBJ，按保留比例或目标面数简化，对比预览后覆盖源文件或下载。[使用方法](docs/mesh-simplifier.md)。
 - **关节控制**：拖动连杆或滑块调姿，支持限位和角度 / 弧度切换；双击连杆定位关节和代码。
 - **辅助显示**：视觉、碰撞、质心、等效惯量长方体、坐标轴与关节轴；支持明暗主题和中英文界面。
 - **三维测量**：两点或两连杆原点之间的距离及 XYZ 分量，提供最多 5 个几何吸附候选点。
@@ -66,5 +67,6 @@ python3 tests/browser_smoke.py
 
 - [**urdf-loader**](https://github.com/gkjohnson/urdf-loaders) — Robust URDF loading for Three.js；本项目复用的 URDF 加载与关节交互基础。
 - [**robot_viewer**](https://github.com/fan-ziqi/robot_viewer) — 机器人可视化工作台与交互设计参考。
+- [**meshoptimizer**](https://github.com/zeux/meshoptimizer) — 浏览器网格简化算法，MIT 许可。
 
 感谢以上项目的作者及开源社区贡献者。欢迎通过 [Issues](https://github.com/XinLang2019/urdf_visualizer/issues) 反馈问题，或提交 Pull Request 改进功能、文档和示例；修改功能时请附复现步骤与验证结果，并保留上游项目及模型资源的署名和许可说明。

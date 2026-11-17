@@ -1699,3 +1699,48 @@ body.light #link-measure-dz,body.light #surface-measure-dz {
 .format-tools p {font-size:10px;line-height:1.7;overflow-wrap:anywhere;}
 .format-tools p:empty {display:none;}
 #conversion-status.error {color:var(--danger);}
+
+.mesh-tools {margin:0 16px 16px;padding-top:12px;border-top:1px solid var(--line);}
+.mesh-tools h3 {font-size:11px;margin:0 0 8px;}
+#mesh-dialog {width:1160px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 32px);padding:0;overflow:auto;}
+#mesh-dialog[open] {display:flex;flex-direction:column;}
+#mesh-dialog .dialog-header {padding:16px 20px;border-bottom:1px solid var(--line);flex-shrink:0;}
+#mesh-dialog h2 {font-size:17px;margin:0;}
+#mesh-name {font-size:11px;color:var(--muted);margin:5px 0 0;overflow-wrap:anywhere;}
+.mesh-settings {display:flex;align-items:end;gap:14px;padding:15px 20px;flex-wrap:wrap;flex-shrink:0;}
+.mesh-settings label {display:flex;flex-direction:column;gap:7px;font-size:11px;min-width:0;}
+.mesh-settings input[type=number] {width:108px;min-width:0;font:12px ui-monospace,monospace;}
+.mesh-settings .mesh-ratio-control {display:grid;grid-template-columns:minmax(100px,1fr) 36px;column-gap:8px;flex:1;min-width:150px;}
+.mesh-ratio-control span {grid-column:1/-1;}
+#mesh-ratio {width:100%;min-width:0;}
+#mesh-ratio-value {text-align:right;}
+.mesh-settings .mesh-check {flex-direction:row;align-items:center;gap:6px;padding-bottom:8px;}
+.mesh-check input {accent-color:var(--blue);margin:0;}
+.mesh-comparison-head {display:grid;grid-template-columns:1fr 1fr;gap:1px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);flex-shrink:0;}
+.mesh-comparison-head>div {padding:10px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.mesh-comparison-head>div+div {border-left:1px solid var(--line);}
+.mesh-comparison-head strong {font-size:12px;}
+.mesh-comparison-head span,.mesh-comparison-head b {font:11px ui-monospace,monospace;color:var(--muted);}
+#mesh-reduction {color:var(--accent-text);}
+#mesh-preview {height:min(50vh,480px);min-height:230px;flex:1 0 230px;position:relative;overflow:hidden;}
+#mesh-preview::after {content:'';position:absolute;top:0;bottom:0;left:50%;width:1px;background:var(--line);pointer-events:none;}
+#mesh-canvas {width:100%;height:100%;display:block;touch-action:none;}
+.mesh-footer {display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 20px;border-top:1px solid var(--line);flex-shrink:0;}
+.mesh-feedback {min-width:0;flex:1;}
+.mesh-feedback p {font-size:11px;margin:0;line-height:1.6;overflow-wrap:anywhere;}
+.mesh-feedback p:empty {display:none;}
+#mesh-status.error {color:var(--danger);}
+#mesh-note {color:var(--muted);font-size:10px;}
+#mesh-progress {width:100%;height:5px;accent-color:var(--blue);margin-bottom:6px;}
+.mesh-footer .button-row {flex-shrink:0;}
+@media(max-width:600px){
+  #mesh-dialog {max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px);}
+  #mesh-dialog .dialog-header,.mesh-settings,.mesh-footer {padding:12px;}
+  .mesh-settings {gap:12px;}
+  .mesh-settings .mesh-ratio-control {flex-basis:100%;}
+  .mesh-settings input[type=number] {width:95px;}
+  .mesh-comparison-head>div {padding:8px;gap:5px;}
+  .mesh-comparison-head span {font-size:9px;}
+  .mesh-footer {align-items:stretch;flex-direction:column;gap:9px;}
+  .mesh-footer .button-row button {flex:1;}
+}

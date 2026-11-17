@@ -176,6 +176,12 @@
   for (const name of ['STLLoader','ColladaLoader','OBJLoader','GLTFLoader']) {
     loaders[name] = parcelRequire(`../node_modules/three/examples/jsm/loaders/${name}.js`)[name];
   }
+  const meshSimplifier=new URDFMeshSimplifier({THREE,viewer,getLanguage:()=>lang,onSaved:async({context})=>{
+    if(context!==state.context||!viewer.robot)return;
+    const joints=Object.fromEntries(Object.entries(viewer.robot.joints).map(([name,j])=>[name,j.jointValue.slice()])),camera=viewer.camera.position.clone(),target=viewer.controls.target.clone(),position=viewer.robot.position.clone(),rotation=viewer.robot.quaternion.clone();
+    if(!await loadText(state.source,context,{replaceEditor:false}))return;
+    viewer.robot.position.copy(position);viewer.robot.quaternion.copy(rotation);for(const [name,value] of Object.entries(joints))viewer.setJointValue(name,...value);viewer.camera.position.copy(camera);viewer.controls.target.copy(target);viewer.controls.update();viewer.redraw();
+  }});
   const updateEnvironment=viewer._updateEnvironment.bind(viewer);
   viewer._updateEnvironment=()=>{
     if(!viewer.robot || objectBounds(viewer.robot).isEmpty())return;
@@ -255,8 +261,12 @@
     textures.forEach(texture=>texture.dispose()); geometries.forEach(geometry=>geometry.dispose()); materials.forEach(material=>{if(material!==viewer._collisionMaterial&&material!==viewer.highlightMaterial)material.dispose();}); object?.removeFromParent();
   }
   function normalize(path) { const out=[]; for(const part of decodeURIComponent(path).replace(/\\/g,'/').split('/')) {if(part==='..')out.pop();else if(part&&part!=='.')out.push(part);} return out.join('/'); }
-  function releaseContext(context) { if(context?.assets)for(const asset of context.assets.values())if(asset.url)URL.revokeObjectURL(asset.url); }
+  function releaseContext(context) { for(const asset of new Set([...(context?.assets?.values()||[]),...(context?.meshOverrides?.values()||[])]))if(asset.url)URL.revokeObjectURL(asset.url); }
   function resolveAsset(path, context) {
+    if(context?.meshOverrides&&!/^(blob:|data:)/.test(path)){
+      const key=normalize(new URL(path,location.href).pathname),matches=[...context.meshOverrides.entries()].filter(([name])=>key.endsWith('/'+name)||name.endsWith('/'+key));
+      if(matches.length===1){const asset=matches[0][1];if(!asset.url)asset.url=URL.createObjectURL(asset.file);return asset.url;}
+    }
     if (!context?.assets || /^(blob:|data:)/.test(path)) return path;
     const url=new URL(path,location.href), key=normalize(url.pathname.replace(/^\/__local__\//,''));
     let asset=context.assets.get(key);
@@ -311,6 +321,7 @@
     robot.traverse(child=>{if(child.isMesh){child.castShadow=true;child.receiveShadow=true;const mats=Array.isArray(child.material)?child.material:[child.material];mats.forEach(mat=>{if(mat?.map)mat.map.colorSpace=THREE.SRGBColorSpace;});}});
     viewer._setIgnoreLimits(!state.limits);
     state.context=context;state.source=text;state.xml=xml;
+    meshSimplifier.setContext(context);
     if(oldContext?.assets!==context?.assets)releaseContext(oldContext);
     if(replaceEditor){$('source').value=text;$('filename').value=context.name;state.baseline=text;}
     else state.baseline=text;
@@ -379,6 +390,12 @@
     if(hasEdits())return status(t('unsaved'),'error');
     let context;
     try {
+      const models=files.filter(file=>URDFModelFormats.isModel(file.name));
+      const hasModel=models.some(file=>!/\.xml$/i.test(file.name))||(await Promise.all(models.map(file=>URDFModelFormats.detect(file)))).some(Boolean);
+      if(!hasModel&&files.some(file=>/\.(stl|obj)$/i.test(file.name))){
+        const assets=new Map(files.map(file=>[normalize(file.webkitRelativePath||file._relativePath||file.name),sourceFiles.fromFile(file)]));
+        meshSimplifier.setContext({assets});status(meshSimplifier.t('loaded'));return;
+      }
       const file=await chooseUrdf(files);if(!file)return;
       const version=++state.version,editorBefore=$('source').value;
       status(t('loading'),'loading');
@@ -485,15 +502,15 @@
           const name=document.createElement('span');name.textContent=entry.name;
           summary.append(icon,name);folder.append(summary);parent.append(folder);append(entry,folder,depth+1);
         }else{
-          const isRobot=URDFModelFormats.isModel(entry.name);
-          const row=document.createElement(isRobot?'button':'div');
+          const isRobot=URDFModelFormats.isModel(entry.name),isMesh=/\.(stl|obj)$/i.test(entry.name);
+          const row=document.createElement(isRobot||isMesh?'button':'div');
           row.className='file-entry';row.dataset.path=entry.path;row.setAttribute('role','treeitem');
           row.setAttribute('aria-selected',String(entry.path===active));row.classList.toggle('selected',entry.path===active);
           row.title=entry.path;
           const icon=document.createElement('span');icon.className='file-entry-icon';icon.textContent=isRobot?'▤':'◇';
           const name=document.createElement('span');name.className='file-entry-name';name.textContent=entry.name;
           const type=document.createElement('span');type.className='file-entry-type';type.textContent=entry.name.split('.').pop().toUpperCase();
-          row.append(icon,name,type);if(isRobot)row.onclick=()=>openTreeFile(entry.path);parent.append(row);
+          row.append(icon,name,type);if(isRobot)row.onclick=()=>openTreeFile(entry.path);else if(isMesh)row.onclick=()=>{if(!meshSimplifier.entries.has(entry.path))meshSimplifier.setContext(state.context);meshSimplifier.open(entry.path);};parent.append(row);
         }
       }
     }
@@ -1773,11 +1790,11 @@
   });
   statics=createStaticsWorkbench({THREE,viewer,grid,refreshScene:()=>{queueLinkMeasurementUpdate();queueJointAngleUpdate();fitView();},getModel:()=>({xml:state.xml,version:state.version}),getLanguage:()=>lang,openRight:()=>setPanel('editor',true),refreshAxes:refreshJointAngleAxis,project:projectMeasurementPoint});
   $('help').onclick=()=>{$('help-dialog').showModal();$('help-content').scrollTop=0;};$('close-help').onclick=()=>$('help-dialog').close();
-  function translate(){document.documentElement.lang=lang==='zh'?'zh-CN':'en';$$('[data-i18n]').forEach(el=>el.textContent=t(el.dataset.i18n));$('language').textContent=lang==='zh'?'EN':'中文';$('joint-search').placeholder=lang==='zh'?'搜索关节…':'Search joints…';renderURDFHelp($('help-content'),lang);updateEditor();filterJoints();refreshWorkspace();statics?.languageChanged();updateLinkMeasureUI();updateLinkMeasurement();if(surfaceSnap.pointer)renderSurfaceSnap();if(viewer.robot){$('model-meta').textContent=`${Object.keys(viewer.robot.links).length} ${t('linkTotal')} · ${Object.keys(viewer.robot.joints).length} ${t('jointTotal')}`;}}
+  function translate(){document.documentElement.lang=lang==='zh'?'zh-CN':'en';$$('[data-i18n]').forEach(el=>el.textContent=t(el.dataset.i18n));$('language').textContent=lang==='zh'?'EN':'中文';$('joint-search').placeholder=lang==='zh'?'搜索关节…':'Search joints…';renderURDFHelp($('help-content'),lang);meshSimplifier.translate();updateEditor();filterJoints();refreshWorkspace();statics?.languageChanged();updateLinkMeasureUI();updateLinkMeasurement();if(surfaceSnap.pointer)renderSurfaceSnap();if(viewer.robot){$('model-meta').textContent=`${Object.keys(viewer.robot.links).length} ${t('linkTotal')} · ${Object.keys(viewer.robot.joints).length} ${t('jointTotal')}`;}}
   $('language').onclick=()=>{lang=lang==='zh'?'en':'zh';translate();};
   $('theme').onclick=()=>{const light=document.body.classList.toggle('light');$('theme').textContent=light?'☀':'☾';document.querySelector('meta[name="theme-color"]').content=light?'#E8F0F8':'#2E6B8A';grid.material.color.set(light?0x2e6b8a:0x6ba3c8);grid.material.opacity=light?.26:.32;viewer.redraw();};
   translate();
   installModelPicking();
   // Small read-only debugging surface for local integration checks.
-  window.urdfWorkbench={get viewer(){return viewer;},get display(){return {...state.display};},get hoveredLink(){return hoveredLink;},get selectedObject(){return state.selected;},get linkMeasurement(){return {enabled:linkMeasurement.enabled,links:linkMeasurement.links.map(link=>link.name),unit:linkMeasurement.unit,distance:linkMeasurement.distance,delta:linkMeasurement.delta?.toArray() || null};},get surfaceMeasurement(){return {anchors:surfaceMeasurement.anchors.map(a=>({link:a.link.name,kind:a.kind,fitted:a.fitted,local:a.local.toArray(),world:a.object.localToWorld(a.local.clone()).toArray()})),unit:surfaceMeasurement.unit,distance:surfaceMeasurement.distance,delta:surfaceMeasurement.delta?.toArray() || null};},get statics(){return statics.snapshot;},get loading(){return $('status').classList.contains('loading');}};
+  window.urdfWorkbench={get meshSimplifier(){return meshSimplifier.snapshot;},get viewer(){return viewer;},get display(){return {...state.display};},get hoveredLink(){return hoveredLink;},get selectedObject(){return state.selected;},get linkMeasurement(){return {enabled:linkMeasurement.enabled,links:linkMeasurement.links.map(link=>link.name),unit:linkMeasurement.unit,distance:linkMeasurement.distance,delta:linkMeasurement.delta?.toArray() || null};},get surfaceMeasurement(){return {anchors:surfaceMeasurement.anchors.map(a=>({link:a.link.name,kind:a.kind,fitted:a.fitted,local:a.local.toArray(),world:a.object.localToWorld(a.local.clone()).toArray()})),unit:surfaceMeasurement.unit,distance:surfaceMeasurement.distance,delta:surfaceMeasurement.delta?.toArray() || null};},get statics(){return statics.snapshot;},get loading(){return $('status').classList.contains('loading');}};
 })();

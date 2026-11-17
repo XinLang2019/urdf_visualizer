@@ -24,6 +24,7 @@ URDF / MJCF / text USDA loading and conversion work directly on GitHub Pages and
 
 - **Models and structure**: URDF, MJCF and USD file / folder import, drag and drop, and a structure graph; bundled robots and native-format examples.
 - **Format conversion**: URDF ↔ MJCF ↔ USD, with text `.usda` export online. Downloads include meshes and a difference report. [Workflow](docs/formats.md#english).
+- **Mesh Simplifier**: simplify loaded STL / OBJ meshes by ratio or target face count, compare previews, then overwrite the source or download. [Workflow](docs/mesh-simplifier.md#english).
 - **Joint control**: pose robots by dragging links or sliders; joint limits and degrees / radians. Double-click a link to locate its joint and code.
 - **Visual helpers**: visual and collision geometry, centers of mass, equivalent inertia boxes, link frames, and joint axes. Light / dark themes and Chinese / English UI.
 - **3D measurement**: point-to-point or link-origin distance with XYZ components, with up to 5 geometric snap candidates.
@@ -66,5 +67,6 @@ Set `CHROME_BIN` to use a specific browser executable.
 
 - [**urdf-loader**](https://github.com/gkjohnson/urdf-loaders) — Robust URDF loading for Three.js; the URDF loading and joint interaction foundation reused by this project.
 - [**robot_viewer**](https://github.com/fan-ziqi/robot_viewer) — A reference for the robot visualization workbench and interaction design.
+- [**meshoptimizer**](https://github.com/zeux/meshoptimizer) — Browser mesh simplification algorithms, MIT licensed.
 
 Thanks to the authors of these projects and the open-source community. Report bugs through [Issues](https://github.com/XinLang2019/urdf_visualizer/issues), or submit a Pull Request to improve features, documentation, and examples. Include reproduction steps and validation results for functional changes, and retain upstream and model-resource attribution and license notices.

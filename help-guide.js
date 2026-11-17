@@ -16,6 +16,7 @@
           lines:['调好站姿，开启“受力分析”；点击力矩标签查看力与力臂，再次点击恢复。','设置坡度、坡向和摩擦系数，点击“一键贴合斜坡”，查看机身角度与轮轴力矩。']}
       ],
       formatsTitle:'三种格式互转',formatsNote:'文件栏选择 URDF / MJCF / USD 后转换下载 ZIP，包含网格和差异说明。MJCF / USD 使用 URDF 工作副本；右侧导出副本包，原文件不覆盖。在线版无需 Python；USD 导出为文本 .usda，二进制 USD 需可选本地服务。',
+      meshTitle:'Mesh Simplifier',meshNote:'文件栏选择已加载的 STL / OBJ，设置目标面数并对比预览，再覆盖源文件或下载。也可单独加载网格文件夹。',
       saveTitle:'编辑与保存',save:'应用代码到模型',write:'保存回源文件',
       saveNote:'编辑器内 Ctrl + S 保存源文件。首次保存可能需要授权，保存后需重新加载以应用修改。',
       controlsTitle:'视图快捷操作',
@@ -37,6 +38,7 @@
           lines:['Set a standing pose and enable Statics. Click a torque label for forces and moment arms; click again to restore labels.','Set slope angle, heading, and friction, then Fit supports to slope. Inspect body attitude and wheel holding torques.']}
       ],
       formatsTitle:'URDF / MJCF / USD conversion',formatsNote:'Choose a target in Files and download a ZIP with meshes and a difference report. Native imports use URDF working copies; Export URDF ZIP retains the native source. No Python is required online. USD exports as text .usda; binary USD needs the optional local service.',
+      meshTitle:'Mesh Simplifier',meshNote:'Select a loaded STL / OBJ in Files, set the target face count and compare previews, then overwrite the source or download. Standalone mesh folders work too.',
       saveTitle:'Edit & save',save:'Apply code to model',write:'Save back to source',
       saveNote:'Ctrl + S saves source in the editor. Saving may need permission. Reload to apply saved code to the model.',
       controlsTitle:'View controls',
@@ -73,6 +75,7 @@
       article.append(link,body);grid.append(article);
     });
     const formats=element('section','help-save');formats.append(element('h3','',guide.formatsTitle),element('p','',guide.formatsNote));const setup=element('a','',language==='zh'?'格式配置与支持范围':'Format setup & support');setup.href='docs/formats.md';setup.target='_blank';setup.rel='noreferrer';formats.append(setup);
+    const mesh=element('section','help-save');mesh.append(element('h3','',guide.meshTitle),element('p','',guide.meshNote));const meshLink=element('a','',language==='zh'?'网格简化使用说明':'Mesh simplification guide');meshLink.href='docs/mesh-simplifier.md';meshLink.target='_blank';meshLink.rel='noreferrer';mesh.append(meshLink);
     const save=element('section','help-save');save.append(element('h3','',guide.saveTitle));
     const actions=element('div','help-save-actions');
     for(const [key,label]of [['Ctrl + Enter',guide.save],['Ctrl + S',guide.write]]){
@@ -83,7 +86,7 @@
     const list=element('dl');
     for(const [key,value]of guide.controls){const item=element('div');item.append(element('dt','',key),element('dd','',value));list.append(item);}
     controls.append(list);
-    container.replaceChildren(intro,grid,formats,save,controls,element('p','help-note',guide.note));
+    container.replaceChildren(intro,grid,formats,mesh,save,controls,element('p','help-note',guide.note));
     document.getElementById('help-footer-hint').textContent=guide.footer;
     document.getElementById('close-help').setAttribute('aria-label',guide.close);
   };
