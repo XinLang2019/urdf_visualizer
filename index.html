@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#2E6B8A">
-  <title>URDF-Viewer</title><link rel="icon" type="image/svg+xml" href="assets/robot.svg"><link rel="stylesheet" href="workbench.css">
+  <title>URDF-Viewer</title><link rel="icon" type="image/svg+xml" href="assets/robot.svg"><link rel="stylesheet" href="workbench.css?v=a93e431e6f76">
 </head>
 <body>
   <main id="viewport" aria-label="机器人三维视图"><urdf-viewer up="+Z" display-shadow tabindex="0" aria-label="三维模型：左键旋转，右键平移，滚轮缩放"></urdf-viewer></main>
@@ -36,7 +36,7 @@
         <div class="format-row"><select id="conversion-target" aria-label="转换目标格式"><option value="urdf">URDF (.urdf)</option><option value="mjcf" selected>MJCF (.xml)</option><option value="usd">USD (.usda)</option></select><button id="convert-model" data-i18n="convertDownload" disabled>转换并下载</button></div>
         <p id="conversion-status" class="muted" role="status"></p>
       </section>
-      <section class="mesh-tools" aria-labelledby="mesh-tools-title"><h3 id="mesh-tools-title">Mesh Simplifier</h3><div class="format-row"><select id="mesh-source" aria-label="选择 STL / OBJ 网格" disabled></select><button id="mesh-open" data-mesh-i18n="open" disabled>简化…</button></div></section>
+      <section class="format-tools mesh-tools" aria-labelledby="mesh-tools-title"><h3 id="mesh-tools-title">Mesh Simplifier</h3><div class="format-row"><select id="mesh-source" aria-label="选择 STL / OBJ 网格" disabled><option value="">未加载 STL / OBJ</option></select><button id="mesh-open" data-mesh-i18n="open" disabled>简化…</button></div></section>
     </div>
   </aside>
   <aside id="joints-panel" class="panel panel-joints" role="tabpanel" aria-labelledby="tab-joints" hidden>
@@ -118,6 +118,6 @@
     <footer class="mesh-footer"><div class="mesh-feedback"><progress id="mesh-progress" max="1" value="0" hidden></progress><p id="mesh-status" role="status"></p><p id="mesh-note"></p></div><div class="button-row"><button id="mesh-overwrite" data-mesh-i18n="overwrite" disabled>覆盖源文件</button><button id="mesh-download" class="active" data-mesh-i18n="download" disabled>下载</button></div></footer>
   </dialog>
   <dialog id="help-dialog" aria-labelledby="help-title"><div class="dialog-header"><div class="help-heading"><img src="assets/robot.svg" width="42" height="42" alt=""><div><span class="help-brand">URDF-Viewer</span><h2 id="help-title" data-i18n="helpTitle">使用指南</h2></div></div><button id="close-help" type="button" aria-label="关闭帮助" autofocus>×</button></div><div id="help-content"></div><footer class="help-footer"><span id="help-footer-hint"></span><button id="restore-layout" data-i18n="restoreLayout">恢复面板布局</button></footer></dialog>
-  <script src="src.a2b27638.js"></script><script src="measurement-features.js"></script><script src="statics-core.js"></script><script src="statics-contacts.js"></script><script src="statics-annotations.js"></script><script src="statics-terrain.js"></script><script src="statics-workbench.js"></script><script src="source-files.js"></script><script src="help-guide.js"></script><script src="browser-model-formats.js"></script><script src="model-formats.js"></script><script src="mesh-simplifier.js"></script><script src="workbench.js"></script>
+  <script src="src.a2b27638.js?v=b322af4b7256"></script><script src="measurement-features.js?v=9bfe43c9498f"></script><script src="statics-core.js?v=bf9fd1fab8b2"></script><script src="statics-contacts.js?v=6f384d8c423c"></script><script src="statics-annotations.js?v=f4912aa1c6fb"></script><script src="statics-terrain.js?v=a4db0ed43fe0"></script><script src="statics-workbench.js?v=c4eeedaef3a5"></script><script src="source-files.js?v=9f751b5cb0a8"></script><script src="help-guide.js?v=bb7ef3bfb132"></script><script src="browser-model-formats.js?v=5927b26ffdba"></script><script src="model-formats.js?v=f97bf0945c43"></script><script src="mesh-simplifier.js?v=daa9a6ef0abf" data-mesh-worker="mesh-simplifier-worker.js?v=e420997a0b9c"></script><script src="workbench.js?v=1358703f5b55"></script>
 </body>
 </html>

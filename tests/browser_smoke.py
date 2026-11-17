@@ -190,6 +190,7 @@ def run(client, url, output):
 
 
 def main():
+    subprocess.run([sys.executable,str(ROOT/'tools/version_assets.py'),'--check'],check=True)
     server_port, debug_port = free_port(), free_port()
     url = f'http://127.0.0.1:{server_port}/'
     output = Path(tempfile.mkdtemp(prefix='urdf-viewer-checks-'))

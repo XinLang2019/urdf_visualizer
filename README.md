@@ -55,6 +55,8 @@ GitHub Pages 与普通静态服务可直接加载 URDF / MJCF / 文本 USDA 并�
 
 ## 验证
 
+修改前端后运行 `python3 tools/version_assets.py`，更新静态资源版本，避免 GitHub Pages 混用旧缓存。浏览器测试会检查版本是否匹配。
+
 安装 Python 3 和 Chrome / Chromium 后运行浏览器回归检查：
 
 ```bash

@@ -1691,7 +1691,7 @@ body.light #link-measure-dz,body.light #surface-measure-dz {
 .statics-wheel-row.over-limit {border-color:var(--focus);border-style:dashed;}
 
 /* Portable robot model import and packaged format conversion. */
-.format-tools {margin:0 16px 16px;padding-top:12px;border-top:1px solid var(--line);}
+.format-tools {margin:0 16px 16px;padding-top:12px;border-top:1px solid var(--line);flex-shrink:0;min-width:0;}
 .format-tools h3 {font-size:11px;margin:0 0 8px;}
 .format-row {display:flex;gap:7px;align-items:center;}
 .format-row select {flex:1;min-width:0;width:0;font-size:11px;padding:5px;}
@@ -1700,8 +1700,6 @@ body.light #link-measure-dz,body.light #surface-measure-dz {
 .format-tools p:empty {display:none;}
 #conversion-status.error {color:var(--danger);}
 
-.mesh-tools {margin:0 16px 16px;padding-top:12px;border-top:1px solid var(--line);}
-.mesh-tools h3 {font-size:11px;margin:0 0 8px;}
 #mesh-dialog {width:1160px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 32px);padding:0;overflow:auto;}
 #mesh-dialog[open] {display:flex;flex-direction:column;}
 #mesh-dialog .dialog-header {padding:16px 20px;border-bottom:1px solid var(--line);flex-shrink:0;}

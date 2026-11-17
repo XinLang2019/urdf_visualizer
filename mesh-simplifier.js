@@ -40,7 +40,8 @@
       this.refreshOptions();this.updateCounts();if(this.messageKey)this.setMessage(this.messageKey,this.messageError);this.updateRatio();
     }
     setContext(context){
-      if(context!==this.context){this.close();this.context=context;this.entries=new Map();}
+      if(context!==this.context){this.close();this.context=context;}
+      this.entries=new Map();
       if(context?.assets){for(const [path,asset] of context.assets)if(supported(path)&&!path.split('/').includes('__converted__'))this.entries.set(path,{path,asset});}
       else if(context?.files){for(const path of context.files)if(supported(path))this.entries.set(path,{path,asset:context.meshOverrides?.get(path)||null});}
       this.refreshOptions();
@@ -58,7 +59,7 @@
       $('mesh-name').textContent=path;$('mesh-name').title=path;$('mesh-ratio').value=50;$('mesh-error').value=1;$('mesh-progress').hidden=false;$('mesh-progress').value=0;$('mesh-dialog').showModal();this.setMessage('reading');this.buttons();this.updateCounts();
       try{
         const asset=await this.asset(entry);const baselineHash=await digest(asset.file);if(generation!==this.generation)return;this.source=asset;this.baselineHash=baselineHash;
-        this.initPreview();this.disposeGroups();this.worker=new Worker(new URL('mesh-simplifier-worker.js',document.baseURI),{type:'module'});
+        this.initPreview();this.disposeGroups();const workerPath=document.querySelector('script[data-mesh-worker]')?.dataset.meshWorker||'mesh-simplifier-worker.js';this.worker=new Worker(new URL(workerPath,document.baseURI),{type:'module'});
         this.worker.onerror=e=>{e.preventDefault();if(generation===this.generation){this.busy=false;$('mesh-progress').hidden=true;this.setMessage('workerFailed',true);this.buttons();}};
         this.worker.onmessage=({data})=>{if(generation!==this.generation)return;try{this.receive(data);}catch(e){this.busy=false;this.setMessage(e.message,true);this.buttons();}};
         this.worker.postMessage({action:'load',file:asset.file});

@@ -55,6 +55,8 @@ Results estimate static loads under gravity and ground contact, using a minimum-
 
 ## Validation
 
+After frontend edits, run `python3 tools/version_assets.py` to refresh content-based asset versions and prevent stale GitHub Pages caches. Browser tests check these versions.
+
 With Python 3 and Chrome / Chromium installed, run the browser regression checks:
 
 ```bash
