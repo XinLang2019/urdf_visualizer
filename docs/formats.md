@@ -13,6 +13,8 @@ GitHub Pages 与普通静态服务可直接加载 **URDF、MJCF、文本 USDA**�
 
 转换使用当前编辑器的模型代码；滑块中的当前关节角度不作为模型零位写入。MJCF / USDA 的“导出 URDF 包”会一起打包工作副本与网格；原生 URDF 的“保存”仍覆盖已授权源文件。
 
+需要 CAD 装配时，选择 **STEP (.step)**；保留连杆层级、几何缩放及 URDF 零位装配位置，输出为毫米单位的静态三角面几何。[STEP 使用说明](step-export.md)。
+
 在线直接打开 GitHub Pages。开发时可以运行任意静态服务，例如 `python3 -m http.server 8080`，然后打开 [localhost:8080](http://localhost:8080)。这里的 Python 只是开发用静态服务器，模型处理完全在浏览器进行。直接用 `file://` 打开可导入本地文件，但内置示例仍需要 HTTP。
 
 ![模型加载、关节控制与格式转换](images/format-conversion.png)
@@ -67,6 +69,8 @@ CHROME_BIN=/usr/bin/microsoft-edge python3 tests/browser_smoke.py
 **URDF / MJCF / text USDA loading and all six conversion directions work directly on GitHub Pages and ordinary static hosting.** Parsing, mesh conversion and ZIP generation run locally in your browser. No Python installation or model uploads.
 
 Load an example or a complete model folder. MJCF / USDA imports become explicit URDF working copies for the existing joint, measurement, editing and statics tools. Choose a target under **Convert format** and download a ZIP; online USD export is standard text **`model.usda`**. Keep the model and `meshes/` together and read `conversion-report.json`. Conversion uses editor source, not slider values as new model zero positions. **Export URDF ZIP** retains native sources; original URDF save-in-place behavior is unchanged.
+
+Choose **STEP (.step)** for a static CAD assembly retaining the link tree, mesh scales and URDF zero-pose placements in millimetres. Mesh-derived geometry remains faceted. [STEP workflow and limits](step-export.md#english).
 
 For development, any static server works, including `python3 -m http.server 8080`; Python then serves files only. File imports also work via `file://`, but bundled examples require HTTP.
 

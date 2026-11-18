@@ -19,7 +19,7 @@
     async request(action,entry,files,target,sourceInfo){
       // Static hosting (including GitHub Pages) always uses local browser readers.
       // The native service remains available only when explicitly requested.
-      if(new URLSearchParams(location.search).get('formats')!=='native')return URDFBrowserFormats.process(action,entry,files,target,sourceInfo);
+      if(target==='step'||new URLSearchParams(location.search).get('formats')!=='native')return URDFBrowserFormats.process(action,entry,files,target,sourceInfo);
       if(location.protocol==='file:')throw Error(this.message('formatsServiceRequired'));
       const form=new FormData(),paths=[];
       for(const [path,file] of files){paths.push(path);form.append('files',file,file.name||path.split('/').pop());}

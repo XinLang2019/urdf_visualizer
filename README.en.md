@@ -24,6 +24,7 @@ URDF / MJCF / text USDA loading and conversion work directly on GitHub Pages and
 
 - **Models and structure**: URDF, MJCF and USD file / folder import, drag and drop, and a structure graph; bundled robots and native-format examples.
 - **Format conversion**: URDF ↔ MJCF ↔ USD, with text `.usda` export online. Downloads include meshes and a difference report. [Workflow](docs/formats.md#english).
+- **STEP assembly export**: export URDF as `.step` with link hierarchy and zero-pose placements, entirely in your browser. Mesh-derived geometry remains faceted. [Workflow](docs/step-export.md#english).
 - **Mesh Simplifier**: simplify loaded STL / OBJ meshes by ratio or target face count, compare previews, then overwrite the source or download. [Workflow](docs/mesh-simplifier.md#english).
 - **Joint control**: pose robots by dragging links or sliders; joint limits and degrees / radians. Double-click a link to locate its joint and code.
 - **Visual helpers**: visual and collision geometry, centers of mass, equivalent inertia boxes, link frames, and joint axes. Light / dark themes and Chinese / English UI.

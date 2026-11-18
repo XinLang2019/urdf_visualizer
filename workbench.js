@@ -51,6 +51,7 @@
     loadCompleteFolder:['请加载包含模型及其网格、引用文件的完整文件夹','Load the complete model folder, including meshes and referenced files'],
     converting:['转换中…','Converting…'],
     conversionDone:['已下载','Downloaded'],
+    conversionStepDone:['已下载 · STEP 零位装配（mm）','Downloaded · STEP zero-pose assembly (mm)'],
     conversionFailed:['转换失败','Conversion failed'],
     exportWorkingCopy:['导出 URDF 包','Export URDF ZIP'],
     copyExported:['副本已导出','Copy exported'],
@@ -1642,8 +1643,9 @@
     conversionBusy=true;updateEditor();$('conversion-status').textContent=t('converting');$('conversion-status').setAttribute('data-i18n','converting');$('conversion-status').classList.remove('error');
     try {
       const text=$('source').value;validate(text);
-      await modelFormats.convert(text,state.context||{name:$('filename').value||'model.urdf',base:new URL('.',location.href).href},$('conversion-target').value);
-      $('conversion-status').textContent=t('conversionDone');$('conversion-status').setAttribute('data-i18n','conversionDone');
+      const report=await modelFormats.convert(text,state.context||{name:$('filename').value||'model.urdf',base:new URL('.',location.href).href},$('conversion-target').value);
+      const done=report?.targetFormat==='step'?'conversionStepDone':'conversionDone';
+      $('conversion-status').textContent=t(done);$('conversion-status').setAttribute('data-i18n',done);
     }catch(error){$('conversion-status').removeAttribute('data-i18n');$('conversion-status').textContent=`${t('conversionFailed')}: ${error.message||String(error)}`;$('conversion-status').classList.add('error');}
     finally{conversionBusy=false;updateEditor();}
   };

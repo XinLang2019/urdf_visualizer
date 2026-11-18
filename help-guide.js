@@ -15,7 +15,7 @@
         {title:'静力学与斜坡',image:'slope-statics.png',alt:'四足贴合斜坡，显示关节力矩、机身角度与接触力',
           lines:['调好站姿，开启“受力分析”；点击力矩标签查看力与力臂，再次点击恢复。','设置坡度、坡向和摩擦系数，点击“一键贴合斜坡”，查看机身角度与轮轴力矩。']}
       ],
-      formatsTitle:'三种格式互转',formatsNote:'文件栏选择 URDF / MJCF / USD 后转换下载 ZIP，包含网格和差异说明。MJCF / USD 使用 URDF 工作副本；右侧导出副本包，原文件不覆盖。在线版无需 Python；USD 导出为文本 .usda，二进制 USD 需可选本地服务。',
+      formatsTitle:'格式转换与 STEP 装配',formatsNote:'文件栏选择 URDF / MJCF / USD 转换下载 ZIP。选择 STEP 可导出保留连杆层级的零位静态装配，单位为 mm，网格保留为三角面几何。在线版无需 Python；USD 导出为文本 .usda。MJCF / USD 使用 URDF 工作副本，导出副本不覆盖原文件。',
       meshTitle:'Mesh Simplifier',meshNote:'文件栏选择已加载的 STL / OBJ，设置目标面数并对比预览，再覆盖源文件或下载。也可单独加载网格文件夹。',
       saveTitle:'编辑与保存',save:'应用代码到模型',write:'保存回源文件',
       saveNote:'编辑器内 Ctrl + S 保存源文件。首次保存可能需要授权，保存后需重新加载以应用修改。',
@@ -37,7 +37,7 @@
         {title:'Statics & slopes',image:'slope-statics.png',alt:'Robot fitted to a slope with joint torques, body attitude, and contact forces',
           lines:['Set a standing pose and enable Statics. Click a torque label for forces and moment arms; click again to restore labels.','Set slope angle, heading, and friction, then Fit supports to slope. Inspect body attitude and wheel holding torques.']}
       ],
-      formatsTitle:'URDF / MJCF / USD conversion',formatsNote:'Choose a target in Files and download a ZIP with meshes and a difference report. Native imports use URDF working copies; Export URDF ZIP retains the native source. No Python is required online. USD exports as text .usda; binary USD needs the optional local service.',
+      formatsTitle:'Format conversion & STEP assembly',formatsNote:'Convert URDF / MJCF / USD in Files and download a ZIP. STEP exports a static zero-pose assembly retaining the link tree, in mm; mesh geometry stays faceted. No Python is required online. USD exports as text .usda. Native imports use URDF working copies; exporting retains the original source.',
       meshTitle:'Mesh Simplifier',meshNote:'Select a loaded STL / OBJ in Files, set the target face count and compare previews, then overwrite the source or download. Standalone mesh folders work too.',
       saveTitle:'Edit & save',save:'Apply code to model',write:'Save back to source',
       saveNote:'Ctrl + S saves source in the editor. Saving may need permission. Reload to apply saved code to the model.',
