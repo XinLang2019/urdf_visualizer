@@ -198,7 +198,8 @@ def main():
     with tempfile.TemporaryDirectory(prefix='urdf-viewer-chrome-') as profile, open(output / 'browser.log', 'w') as log:
         server_command=([sys.executable,str(ROOT/'model_server.py'),'--port',str(server_port),'--python',os.environ.get('URDF_FORMAT_PYTHON',sys.executable)] if os.environ.get('URDF_TEST_FORMATS')=='1' else [sys.executable,'-m','http.server',str(server_port),'--bind','127.0.0.1'])
         server = subprocess.Popen(server_command, cwd=ROOT, stdout=log, stderr=log)
-        chrome = subprocess.Popen([BROWSER, '--headless=new', '--no-sandbox', '--disable-dev-shm-usage', '--disable-background-networking', '--enable-unsafe-swiftshader', '--use-angle=swiftshader', f'--remote-debugging-port={debug_port}', f'--remote-allow-origins=http://localhost:{debug_port}', '--user-data-dir=' + profile, 'about:blank'], stdout=log, stderr=log)
+        heap_args=['--js-flags=--max-old-space-size='+str(int(os.environ['URDF_TEST_HEAP_MB']))] if os.environ.get('URDF_TEST_HEAP_MB') else []
+        chrome = subprocess.Popen([BROWSER, '--headless=new', '--no-sandbox', '--disable-dev-shm-usage', '--disable-background-networking', '--enable-unsafe-swiftshader', '--use-angle=swiftshader', f'--remote-debugging-port={debug_port}', f'--remote-allow-origins=http://localhost:{debug_port}', '--user-data-dir=' + profile, *heap_args, 'about:blank'], stdout=log, stderr=log)
         client = None
         try:
             deadline = time.time() + 20

@@ -1699,6 +1699,9 @@ body.light #link-measure-dz,body.light #surface-measure-dz {
 .format-tools p {font-size:10px;line-height:1.7;overflow-wrap:anywhere;}
 .format-tools p:empty {display:none;}
 #conversion-status.error {color:var(--danger);}
+.conversion-progress-row {display:flex;align-items:center;gap:8px;margin-top:6px;}
+.conversion-progress-row progress {flex:1;min-width:0;height:5px;accent-color:var(--accent);}
+.conversion-progress-row button {font-size:11px;padding:3px 8px;}
 
 #mesh-dialog {width:1160px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 32px);padding:0;overflow:auto;}
 #mesh-dialog[open] {display:flex;flex-direction:column;}

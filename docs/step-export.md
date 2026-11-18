@@ -11,6 +11,10 @@
 
 `conversion-report.json` 记录单位、零位约定、独立几何定义数、三角面数量与转换说明。大网格的 STEP 文件可能较大，可先使用 Mesh Simplifier；不会在导出时自动降低精度。
 
+转换在后台线程中分块生成 STEP / ZIP，优先写入浏览器站点私有的临时文件，避免完整大字符串占满网页内存；界面显示进度，可随时取消，取消后清理未完成文件。请通过 HTTPS 或 localhost 使用。临时存储不可用时，仅允许不超过 64 MiB 的小文件回退。
+
+为避免超大输入耗尽内存，单个网格目前最多 25 万个三角面；文本 OBJ / DAE / STL 单文件最多 32 MiB。超过限制会明确提示先使用 Mesh Simplifier，不会自动降低模型精度。装配中的重复网格只计一次几何定义。
+
 ## 开发验证
 
 仅测试需要 CAD 内核；网页用户无需安装：
@@ -18,6 +22,8 @@
 ```bash
 .venv-formats/bin/python -m pip install cadquery-ocp-novtk
 URDF_TEST_BROWSER_FORMATS=1 CHROME_BIN=/usr/bin/microsoft-edge .venv-formats/bin/python tests/step_export_browser.py
+# 256 MiB JS 堆：本地文件夹导入、真实大文件下载、响应、取消、重试与容量保护
+CHROME_BIN=/usr/bin/microsoft-edge .venv-formats/bin/python tests/step_export_stability.py
 ```
 
 真实浏览器下载 ZIP，再使用 Open CASCADE 读取并核对：装配层级和名称、每个几何实例的世界坐标、毫米单位、URDF 零位、共享零件、实体有效性及开放网格。`URDF_STEP_TEST_GO2=1` 追加内置 Go2 大模型检查。
@@ -33,5 +39,9 @@ The AP214 assembly retains the robot / link hierarchy, each visual's placement, 
 Meshes and primitives become triangular planar geometry. Confirmed closed manifold components with nonoverlapping shells become solids. Open, nonmanifold, overlapping or potentially nested shells remain surfaces; holes are not filled. Degenerate triangles are skipped and reported. Analytic CAD surfaces, live CAD joint constraints, inertia, textures and materials are not reconstructed. Joint names, types and axes are included in assembly descriptions. STEP import and reverse conversion are not supported.
 
 The ZIP includes `conversion-report.json` with units, pose convention, unique geometry count, triangle count and limitations. Large mesh-derived STEP files may be large; Mesh Simplifier can reduce them explicitly before export. Export never silently simplifies geometry.
+
+STEP and ZIP generation runs in a background worker, writing bounded chunks to browser-private temporary storage instead of retaining a giant string in the page. Progress and cancellation are available; cancellation removes partial output. Use HTTPS or localhost. If temporary storage is unavailable, only a bounded small-file fallback (64 MiB) is allowed. Individual meshes are limited to 250,000 triangles, and text OBJ / DAE / STL files to 32 MiB. Exceeding a limit produces an actionable simplification message without silently changing geometry.
+
+`tests/step_export_stability.py` uses a 256 MiB JS heap, local-folder Go2 imports and real downloads to check main-thread responsiveness, page and worker heaps, cancellation, cleanup, retry, unavailable storage and oversized mesh protection.
 
 The development test above reads real browser downloads with Open CASCADE and independently checks named hierarchy, each instance's world coordinates, shared geometry, units, valid solids and open surfaces. Set `URDF_STEP_TEST_GO2=1` to include the bundled Go2 model. The CAD kernel is only a development test dependency.

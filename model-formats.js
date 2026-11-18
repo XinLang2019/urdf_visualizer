@@ -16,10 +16,10 @@
       if(xml.documentElement.tagName==='mujocoinclude')return null;
       return extension(file.name)==='urdf'?'urdf':extension(file.name)==='mjcf'?'mjcf':null;
     }
-    async request(action,entry,files,target,sourceInfo){
+    async request(action,entry,files,target,sourceInfo,options){
       // Static hosting (including GitHub Pages) always uses local browser readers.
       // The native service remains available only when explicitly requested.
-      if(target==='step'||new URLSearchParams(location.search).get('formats')!=='native')return URDFBrowserFormats.process(action,entry,files,target,sourceInfo);
+      if(target==='step'||new URLSearchParams(location.search).get('formats')!=='native')return URDFBrowserFormats.process(action,entry,files,target,sourceInfo,options);
       if(location.protocol==='file:')throw Error(this.message('formatsServiceRequired'));
       const form=new FormData(),paths=[];
       for(const [path,file] of files){paths.push(path);form.append('files',file,file.name||path.split('/').pop());}
@@ -53,7 +53,8 @@
       const text=new XMLSerializer().serializeToString(document),name=file.name.replace(/\.[^.]+$/,'')+'.viewer.urdf';
       return {text,context:{...context,name,assets,originalFormat:format,originalName:file.name,formatReport:result.report,sourceFile:{name,handle:null,savedText:null,written:false}}};
     }
-    async bundle(text,context){
+    async bundle(text,context,{signal}={}){
+      signal?.throwIfAborted();
       let entry=normalize(context?.path||context?.name||'model.urdf');
       if(context?.originalFormat||!/\.(urdf|xml)$/i.test(entry))entry=normalize(entry.slice(0,entry.lastIndexOf('/')+1)+(context?.name||'model.viewer.urdf'));
       const files=new Map();
@@ -62,7 +63,7 @@
         const wanted=context.files.filter(p=>/\.(stl|dae|obj|mtl|gltf|glb|bin|png|jpg|jpeg|webp|bmp|tga)$/i.test(p));
         // Fetch a bounded number at once so large robot packages do not exhaust connections.
         for(let start=0;start<wanted.length;start+=6)await Promise.all(wanted.slice(start,start+6).map(async path=>{
-          const r=await fetch(new URL('urdf/'+path,location.href));if(!r.ok)throw Error('Missing resource: '+path);
+          const r=await fetch(new URL('urdf/'+path,location.href),{signal});if(!r.ok)throw Error('Missing resource: '+path);
           files.set(path,new File([await r.blob()],path.split('/').pop()));
         }));
       }else{
@@ -70,17 +71,20 @@
         for(const element of doc.querySelectorAll('mesh[filename],texture[filename]')){
           const ref=element.getAttribute('filename');
           if(ref.startsWith('package://'))throw Error(this.message('loadCompleteFolder'));
-          const url=new URL(ref,context?.base||location.href),r=await fetch(url);if(!r.ok)throw Error('Missing resource: '+ref);
+          const url=new URL(ref,context?.base||location.href),r=await fetch(url,{signal});if(!r.ok)throw Error('Missing resource: '+ref);
           const path=normalize(entry.slice(0,entry.lastIndexOf('/')+1)+ref);files.set(path,new File([await r.blob()],path.split('/').pop()));
         }
       }
       files.set(entry,new File([text],entry.split('/').pop(),{type:'application/xml'}));
       return {entry,files};
     }
-    async convert(text,context,target){
-      const {entry,files}=await this.bundle(text,context),response=await this.request('convert',entry,files,target,context?.originalFormat?{format:context.originalFormat,warnings:context.formatReport?.warnings||[]}:null);
-      const blob=await response.blob(),url=URL.createObjectURL(blob),anchor=document.createElement('a');
-      anchor.href=url;anchor.download=(context?.name||'model').replace(/\.[^.]+$/,'')+'-'+target+'.zip';document.body.append(anchor);anchor.click();anchor.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+    async convert(text,context,target,options={}){
+      options.signal?.throwIfAborted();options.onProgress?.({stage:'reading',progress:0});
+      const {entry,files}=await this.bundle(text,context,options);options.signal?.throwIfAborted();
+      const response=await this.request('convert',entry,files,target,context?.originalFormat?{format:context.originalFormat,warnings:context.formatReport?.warnings||[]}:null,options);
+      options.signal?.throwIfAborted();
+      const blob=response.downloadBlob||await response.blob(),url=URL.createObjectURL(blob),anchor=document.createElement('a');
+      anchor.href=url;anchor.download=(context?.name||'model').replace(/\.[^.]+$/,'')+'-'+target+'.zip';document.body.append(anchor);anchor.click();anchor.remove();setTimeout(()=>{URL.revokeObjectURL(url);response.cleanup?.();},300000);
       const report=response.headers.get('X-Conversion-Report');return report?JSON.parse(decodeURIComponent(report)):null;
     }
   };

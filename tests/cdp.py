@@ -23,8 +23,10 @@ class CDP:
   mask=self.receive(4) if b&128 else None;data=self.receive(n)
   if mask:data=bytes(v^mask[i%4] for i,v in enumerate(data))
   return json.loads(data)
- def call(self,method,params=None):
-  self.i+=1;ident=self.i;data=json.dumps({'id':ident,'method':method,'params':params or {}}).encode();mask=os.urandom(4);n=len(data)
+ def call(self,method,params=None,session_id=None):
+  self.i+=1;ident=self.i;request={'id':ident,'method':method,'params':params or {}}
+  if session_id:request['sessionId']=session_id
+  data=json.dumps(request).encode();mask=os.urandom(4);n=len(data)
   header=bytes([129,128|n]) if n<126 else bytes([129,254])+struct.pack('!H',n) if n<65536 else bytes([129,255])+struct.pack('!Q',n)
   self.s.sendall(header+mask+bytes(v^mask[i%4] for i,v in enumerate(data)))
   while True:

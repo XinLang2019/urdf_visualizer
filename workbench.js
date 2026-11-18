@@ -53,6 +53,13 @@
     conversionDone:['已下载','Downloaded'],
     conversionStepDone:['已下载 · STEP 零位装配（mm）','Downloaded · STEP zero-pose assembly (mm)'],
     conversionFailed:['转换失败','Conversion failed'],
+    cancelConversion:['取消','Cancel'],
+    conversionCancelled:['已取消','Cancelled'],
+    stepReading:['读取网格','Reading meshes'],
+    stepPreparing:['准备几何','Preparing geometry'],
+    stepTopology:['分析网格','Analyzing mesh'],
+    stepWriting:['后台生成 STEP','Writing STEP in background'],
+    stepPackaging:['完成下载包','Finalizing download'],
     exportWorkingCopy:['导出 URDF 包','Export URDF ZIP'],
     copyExported:['副本已导出','Copy exported'],
     chooseModel:['选择机器人模型…','Choose a robot…'],
@@ -157,7 +164,7 @@
   const sourceFiles=new URDFSourceFiles(t);
   const modelFormats=new URDFModelFormats(t);
   if(nativeFormats)$('conversion-target').querySelector('[value="usd"]').textContent='USD (.usd)';
-  let conversionBusy=false;
+  let conversionBusy=false,conversionController=null;
   // Keep initialization failures visible even when WebGL is unavailable.
   let THREE, viewer, grid;
   let activeDragJoint=null,statics=null;
@@ -295,6 +302,7 @@
   async function loadText(text, context, {replaceEditor=true}={}) {
     text=text.replace(/\r\n?/g,'\n');
     const xml=validate(text);
+    conversionController?.abort();
     context.sourceFile ||= {name:context.name,handle:null,savedText:null,written:false};
     const version=++state.version;
     status(t('loading'),'loading'); $('editor-error').hidden=true;
@@ -1640,15 +1648,22 @@
   $('source').onkeydown=event=>{if(event.key==='Tab'){event.preventDefault();const source=$('source');source.setRangeText('  ',source.selectionStart,source.selectionEnd,'end');source.dispatchEvent(new Event('input'));}};
   $('convert-model').onclick=async()=>{
     if(conversionBusy)return;
-    conversionBusy=true;updateEditor();$('conversion-status').textContent=t('converting');$('conversion-status').setAttribute('data-i18n','converting');$('conversion-status').classList.remove('error');
+    conversionBusy=true;conversionController=new AbortController();updateEditor();$('conversion-status').textContent=t('converting');$('conversion-status').setAttribute('data-i18n','converting');$('conversion-status').classList.remove('error');
+    const step=$('conversion-target').value==='step';$('conversion-progress-row').hidden=!step;$('conversion-progress').value=0;
+    const onProgress=info=>{
+      $('conversion-progress').value=Math.max($('conversion-progress').value,info.progress||0);
+      const label={reading:'stepReading',preparing:'stepPreparing',topology:'stepTopology',writing:'stepWriting',packaging:'stepPackaging'}[info.stage]||'converting';
+      $('conversion-status').removeAttribute('data-i18n');$('conversion-status').textContent=t(label)+' · '+Math.round($('conversion-progress').value*100)+'%';
+    };
     try {
       const text=$('source').value;validate(text);
-      const report=await modelFormats.convert(text,state.context||{name:$('filename').value||'model.urdf',base:new URL('.',location.href).href},$('conversion-target').value);
+      const report=await modelFormats.convert(text,state.context||{name:$('filename').value||'model.urdf',base:new URL('.',location.href).href},$('conversion-target').value,{signal:conversionController.signal,onProgress});
       const done=report?.targetFormat==='step'?'conversionStepDone':'conversionDone';
       $('conversion-status').textContent=t(done);$('conversion-status').setAttribute('data-i18n',done);
-    }catch(error){$('conversion-status').removeAttribute('data-i18n');$('conversion-status').textContent=`${t('conversionFailed')}: ${error.message||String(error)}`;$('conversion-status').classList.add('error');}
-    finally{conversionBusy=false;updateEditor();}
+    }catch(error){$('conversion-status').removeAttribute('data-i18n');$('conversion-status').textContent=error.name==='AbortError'?t('conversionCancelled'):`${t('conversionFailed')}: ${error.message||String(error)}`;$('conversion-status').classList.toggle('error',error.name!=='AbortError');}
+    finally{conversionBusy=false;conversionController=null;$('conversion-progress-row').hidden=true;updateEditor();}
   };
+  $('cancel-conversion').onclick=()=>conversionController?.abort();
   $('reload').onclick=async()=>{if(state.saving)return;try{await loadText($('source').value,state.context||{name:$('filename').value||'newfile.urdf',base:new URL('.',location.href).href},{replaceEditor:false});}catch(error){fail(error);}};
   $('save').onclick=async()=>{
     const text=$('source').value;if(state.saving||!text.trim())return;

@@ -42,21 +42,43 @@
   }
   function worlds(m){const root=validate(m),w=new Map([[root,I()]]);while(w.size<m.links.size)for(const j of m.joints)if(w.has(j.parent)&&!w.has(j.child))w.set(j.child,product(w.get(j.parent),j.pose));return w;}
   class Resources {
-    constructor(entry,files){this.entry=normalize(entry);this.files=files;this.cache=new Map();}
+    constructor(entry,files,options={}){this.entry=normalize(entry);this.files=files;this.cache=new Map();this.options=options;}
     resolve(ref,base=this.entry){let p=ref.replace(/^package:\/\//,'');const candidates=[];try{candidates.push(normalize(directory(base)+p));}catch{}try{candidates.push(normalize(p));}catch{}
       for(const key of candidates)if(this.files.has(key))return key;
       let matches=[...this.files.keys()].filter(k=>k.endsWith('/'+p)||p.endsWith('/'+k));if(matches.length===1)return matches[0];
       const file=p.split('/').pop();matches=[...this.files.keys()].filter(k=>k.split('/').pop()===file);if(matches.length===1)return matches[0];
       throw Error('Missing or ambiguous resource / 资源缺失或名称不唯一: '+ref);
     }
-    text(path=this.entry){return this.files.get(path).text();}
+    text(path=this.entry){this.options.signal?.throwIfAborted();return this.files.get(path).text();}
     async mesh(ref,scale=[1,1,1],base=this.entry){const path=this.resolve(ref,base),key=path+'|'+scale.join();if(!this.cache.has(key))this.cache.set(key,this.loadMesh(path,scale));return this.cache.get(key);}
     async loadMesh(path,scale){
       const file=this.files.get(path),ext=path.split('.').pop().toLowerCase(),manager=new T.LoadingManager();manager.setURLModifier(()=>{throw Error('Collect external mesh resources in the model folder / 请收集网格依赖文件');});let scene;
+      this.options.signal?.throwIfAborted();
+      if(this.options.step&&['dae','obj'].includes(ext)&&file.size>32*1024*1024)throw Error('STEP: text mesh exceeds 32 MiB; simplify it first. / 文本网格超过 32 MiB，请先简化: '+path);
+      if(this.options.step&&ext==='stl'){
+        const header=await file.slice(0,84).arrayBuffer(),count=header.byteLength===84?new DataView(header).getUint32(80,true):0,binary=count>0&&84+count*50<=file.size;
+        if(binary&&count>250000)throw Error('STEP: a mesh exceeds 250,000 triangles; simplify it with Mesh Simplifier first. / 单个网格超过 25 万面，请先用 Mesh Simplifier 简化: '+path);
+        if(!binary&&file.size>32*1024*1024)throw Error('STEP: text STL exceeds 32 MiB; simplify it with Mesh Simplifier first. / 文本 STL 超过 32 MiB，请先用 Mesh Simplifier 简化: '+path);
+      }
       if(ext==='stl'){const Loader=parcelRequire('../node_modules/three/examples/jsm/loaders/STLLoader.js').STLLoader;scene=new T.Mesh(new Loader(manager).parse(await file.arrayBuffer()));}
       else if(ext==='obj'){const Loader=parcelRequire('../node_modules/three/examples/jsm/loaders/OBJLoader.js').OBJLoader;scene=new Loader(manager).parse(await file.text());}
       else if(ext==='dae'){const Loader=parcelRequire('../node_modules/three/examples/jsm/loaders/ColladaLoader.js').ColladaLoader;scene=new Loader(manager).parse(await file.text(),'').scene;scene.quaternion.identity();}
       else throw Error('Browser mesh conversion supports STL, OBJ and DAE / 浏览器转换支持 STL、OBJ、DAE 网格: '+path);
+      if(this.options.step){
+        this.options.signal?.throwIfAborted();scene.updateMatrixWorld(true);let pointCount=0,faceCount=0;
+        scene.traverse(o=>{const p=o.geometry?.attributes.position;if(p){pointCount+=p.count;faceCount+=Math.floor((o.geometry.index?.count||p.count)/3);}});
+        if(faceCount>250000)throw Error('STEP: a mesh exceeds 250,000 triangles; simplify it with Mesh Simplifier first. / 单个网格超过 25 万面，请先用 Mesh Simplifier 简化: '+path);
+        if(!pointCount||!faceCount)throw Error('Empty mesh / 空网格: '+path);
+        const points=new Float64Array(pointCount*3),faces=new Uint32Array(faceCount*3),scaling=I().makeScale(...scale),p=new T.Vector3();let offset=0,f=0;
+        scene.traverse(o=>{const a=o.geometry?.attributes.position;if(!a)return;const matrix=product(scaling,o.matrixWorld);
+          for(let i=0;i<a.count;i++){p.fromBufferAttribute(a,i).applyMatrix4(matrix);points.set([p.x,p.y,p.z],(offset+i)*3);}
+          const index=o.geometry.index,count=index?index.count:a.count,reverse=matrix.determinant()<0;
+          for(let i=0;i+2<count;i+=3)for(const k of reverse?[2,1,0]:[0,1,2])faces[f++]=offset+(index?index.getX(i+k):i+k);
+          offset+=a.count;o.geometry.dispose();
+        });
+        this.options.onProgress?.({stage:'reading',name:path,progress:.05});await new Promise(resolve=>setTimeout(resolve,0));this.options.signal?.throwIfAborted();
+        return {points,faces};
+      }
       scene.updateMatrixWorld(true);const points=[],faces=[],scaling=I().makeScale(...scale);
       scene.traverse(o=>{const p=o.geometry?.attributes?.position;if(!p)return;const matrix=product(scaling,o.matrixWorld),offset=points.length;for(let i=0;i<p.count;i++)points.push(point(matrix,[p.getX(i),p.getY(i),p.getZ(i)]));const idx=o.geometry.index,count=idx?idx.count:p.count;for(let i=0;i+2<count;i+=3){const f=[0,1,2].map(k=>offset+(idx?idx.getX(i+k):i+k));if(matrix.determinant()<0)f.reverse();faces.push(f);}});
       if(!points.length||!faces.length)throw Error('Empty mesh / 空网格: '+path);return {points,faces};
@@ -85,6 +107,7 @@
     for(const e of children(root,'link')){
       const l=link(m,e.getAttribute('name')),a=child(e,'inertial');if(a){const mass=child(a,'mass'),i=child(a,'inertia');if(!mass||!i)throw Error('Incomplete inertial / 惯量信息不完整: '+l.name);l.mass=number(mass.getAttribute('value'));const frame=urdfPose(a);l.com=xyz(frame);l.inertia=rotateTensor(tensor(['ixx','iyy','izz','ixy','ixz','iyz'].map(k=>number(i.getAttribute(k)))),frame);}
       for(const [tag,key] of [['visual','visuals'],['collision','collisions']])for(const g of children(e,tag)){
+        if(r.options.step&&tag==='collision'&&children(e,'visual').length)continue;
         const geo=child(g,'geometry')?.firstElementChild;if(!geo)throw Error('Missing geometry: '+l.name);let mat=child(g,'material');if(mat&&!child(mat,'color'))mat=materials.get(mat.getAttribute('name'))||mat;
         const color=nums(child(mat||g,'color')?.getAttribute('rgba'),[.72,.78,.84,1]),s=shape(geo.tagName,[],urdfPose(g),color);
         if(s.kind==='mesh')s.mesh=await r.mesh(geo.getAttribute('filename'),nums(geo.getAttribute('scale'),[1,1,1]));
@@ -344,18 +367,18 @@
     const end=new Uint8Array(22),e=new DataView(end.buffer);e.setUint32(0,0x06054b50,true);e.setUint16(8,files.size,true);e.setUint16(10,files.size,true);e.setUint32(12,centralSize,true);e.setUint32(16,offset,true);return new Blob([...parts,...central,end],{type:'application/zip'});
   }
   window.URDFBrowserFormats={
-    async process(action,entry,files,target='urdf',sourceInfo){
-      await new Promise(resolve=>setTimeout(resolve,0));const r=new Resources(entry,files),file=files.get(r.entry);if(!file)throw Error('Missing model entry: '+entry);if(files.size>1500||[...files.values()].reduce((s,f)=>s+f.size,0)>384*1024*1024)throw Error('Model exceeds 384 MiB / 1500 files');
+    async process(action,entry,files,target='urdf',sourceInfo,options={}){
+      await new Promise(resolve=>setTimeout(resolve,0));options.signal?.throwIfAborted();const r=new Resources(entry,files,{...options,step:target==='step'}),file=files.get(r.entry);if(!file)throw Error('Missing model entry: '+entry);if(files.size>1500||[...files.values()].reduce((s,f)=>s+f.size,0)>384*1024*1024)throw Error('Model exceeds 384 MiB / 1500 files');
       const ext=file.name.split('.').pop().toLowerCase(),isUSD=['usd','usda','usdc','usdz'].includes(ext),text=isUSD?null:await file.text(),format=isUSD?'usd':xml(text).tagName==='robot'?'urdf':'mjcf';
       const model=await (format==='urdf'?readURDF(r):format==='mjcf'?readMJCF(r):readUSD(r));for(const note of sourceInfo?.warnings||[])model.note(note);
-      const result=target==='urdf'?writeURDF(model):target==='mjcf'?writeMJCF(model):target==='usd'?writeUSD(model):target==='step'?await URDFStepExport.write(model,{root:validate(model),geometryMesh}):null;if(!result)throw Error('Unsupported export format: '+target);
+      if(target==='step'){r.cache.clear();return URDFStepExport.convert(model,{root:validate(model),geometryMesh,sourceInfo,format},options);}
+      const result=target==='urdf'?writeURDF(model):target==='mjcf'?writeMJCF(model):target==='usd'?writeUSD(model):null;if(!result)throw Error('Unsupported export format: '+target);
       const report={sourceFormat:sourceInfo?.format||format,workingFormat:format,targetFormat:target,entry:result.entry,model:model.name,links:model.links.size,joints:model.joints.length,units:{length:'m',mass:'kg',angle:'rad'},upAxis:'Z',engine:'browser',scope:'Rigid-body tree geometry, joints and explicit inertial data; not a dynamics-equivalence guarantee.',warnings:model.notes};
-      if(target==='step'){report.units.length='mm';report.scope='Static mesh-derived CAD assembly at URDF zero positions; no kinematic CAD constraints or inertial data.';report.step=result.details;}
       if(action==='import'){
         const assets=[];for(const [path,data] of result.files)if(path!==result.entry){const bytes=new TextEncoder().encode(data);let binary='';for(let i=0;i<bytes.length;i+=16384)binary+=String.fromCharCode(...bytes.subarray(i,i+16384));assets.push({path,data:btoa(binary)});}
         return new Response(JSON.stringify({urdf:result.files.get(result.entry),assets,report}),{headers:{'Content-Type':'application/json'}});
       }
-      result.files.set('conversion-report.json',JSON.stringify(report,null,2));result.files.set('README.txt',target==='step'?'Open model.step in a STEP-compatible CAD application. Geometry is embedded; no external meshes are needed.\nURDF zero-position assembly, millimetres, Z up. Joint motion is not exported as CAD constraints.\nMesh surfaces are faceted; open meshes remain surfaces.\nSee conversion-report.json for details. Generated locally in your browser.\n':'Open '+result.entry+' with its meshes/ folder beside it.\nSee conversion-report.json for support limits.\nGenerated locally in your browser.\n');return new Response(zip(result.files),{headers:{'Content-Type':'application/zip','X-Conversion-Report':encodeURIComponent(JSON.stringify(report))}});
+      result.files.set('conversion-report.json',JSON.stringify(report,null,2));result.files.set('README.txt','Open '+result.entry+' with its meshes/ folder beside it.\nSee conversion-report.json for support limits.\nGenerated locally in your browser.\n');return new Response(zip(result.files),{headers:{'Content-Type':'application/zip','X-Conversion-Report':encodeURIComponent(JSON.stringify(report))}});
     },
     // Expose the same readers to the integration checks; UI imports still use File objects.
     parseUSDA,validate,principal
