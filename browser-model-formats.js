@@ -257,6 +257,31 @@
   }
   function obj(mesh){return mesh.points.map(p=>'v '+fmt(p)).concat(mesh.faces.map(f=>'f '+f.map(i=>i+1).join(' '))).join('\n')+'\n';}
   function meshAssets(){const files=new Map(),cache=new Map();return {files,path(s){const mesh=geometryMesh(s);if(!cache.has(mesh)){const path='meshes/mesh_'+cache.size+'.obj';cache.set(mesh,path);files.set(path,obj(mesh));}return cache.get(mesh);}};}
+  // Format generated XML through its DOM so escaped attribute values remain intact.
+  function formattedXML(text){
+    const lines=['<?xml version="1.0" encoding="utf-8"?>'];
+    function element(node,depth){
+      const indent='  '.repeat(depth),attrs=[...node.attributes].map(a=>` ${a.name}="${escape(a.value)}"`).join(''),tag=node.tagName;
+      if(!node.children.length){lines.push(`${indent}<${tag}${attrs}/>`);return;}
+      lines.push(`${indent}<${tag}${attrs}>`);for(const child of node.children)element(child,depth+1);lines.push(`${indent}</${tag}>`);
+    }
+    element(xml(text),0);return lines.join('\n')+'\n';
+  }
+  // Bound mesh-array rows without splitting a point tuple or changing its values.
+  function usdArray(property,values){
+    if(property.length+values.reduce((n,v)=>n+v.length+2,0)<96)return [`${property} = [${values.join(', ')}]`];
+    const lines=[`${property} = [`];let row='';
+    for(const value of values){if(row&&row.length+value.length+2>96){lines.push(row+',');row='';}row+=(row?', ':'')+value;}
+    if(row)lines.push(row);lines.push(']');return lines;
+  }
+  function formattedUSD(lines){
+    let depth=0;return lines.map(line=>{
+      if(['}',')',']'].includes(line))depth--;
+      const result=line?'    '.repeat(depth)+line:'';
+      if(line.endsWith('{')||line==='('||line.endsWith(' = ['))depth++;
+      return result;
+    }).join('\n')+'\n';
+  }
   function writeURDF(m){
     validate(m);const a=meshAssets(),lines=['<?xml version="1.0" encoding="utf-8"?>',`<robot name="${escape(m.name)}">`];
     for(const l of m.links.values()){lines.push(`<link name="${escape(l.name)}">`);if(l.mass>0)lines.push(`<inertial><origin xyz="${fmt(l.com)}"/><mass value="${l.mass}"/><inertia ${['ixx','iyy','izz','ixy','ixz','iyz'].map((k,i)=>k+'="'+tensorValues(l.inertia)[i]+'"').join(' ')}/></inertial>`);
@@ -264,7 +289,7 @@
       lines.push('</link>');
     }
     for(const j of m.joints){lines.push(`<joint name="${escape(j.name)}" type="${j.kind}"><parent link="${escape(j.parent)}"/><child link="${escape(j.child)}"/>${origin(j.pose)}`);if(!['fixed','floating'].includes(j.kind))lines.push(`<axis xyz="${fmt(j.axis)}"/><limit effort="${j.effort}" velocity="${j.velocity}"${j.kind!=='continuous'?` lower="${j.lower}" upper="${j.upper}"`:''}/><dynamics damping="${j.damping}" friction="${j.friction}"/>`);if(j.mimic)lines.push(`<mimic joint="${escape(j.mimic.joint)}" multiplier="${j.mimic.multiplier??1}" offset="${j.mimic.offset??0}"/>`);lines.push('</joint>');}
-    lines.push('</robot>');a.files.set('model.urdf',lines.join('\n'));return {entry:'model.urdf',files:a.files};
+    lines.push('</robot>');a.files.set('model.urdf',formattedXML(lines.join('\n')));return {entry:'model.urdf',files:a.files};
   }
   function writeMJCF(m){
     const root=validate(m),a=meshAssets(),assets=[],motors=[],equalities=[],kids=name=>m.joints.filter(j=>j.parent===name),fixedJointNames=Object.fromEntries(m.joints.filter(j=>j.kind==='fixed').map(j=>[j.child,j.name])),rootLink=m.links.get(root),emptyRoot=!rootLink.mass&&!rootLink.visuals.length&&!rootLink.collisions.length;
@@ -287,17 +312,19 @@
     const bodies=emptyRoot?kids(root).map(j=>body(j.child,j,true)).join('\n'):body(root,null,true);
     for(const j of m.joints)if(j.mimic)equalities.push(`<joint joint1="${escape(j.name)}" joint2="${escape(j.mimic.joint)}" polycoef="${fmt([j.mimic.offset||0,j.mimic.multiplier??1,0,0,0])}"/>`);
     const text=`<?xml version="1.0" encoding="utf-8"?>\n<mujoco model="${escape(m.name)}"><compiler angle="radian" fusestatic="false" inertiafromgeom="false"/><custom><text name="urdf_viewer_metadata" data="${escape(JSON.stringify(metadata))}"/></custom><asset>${assets.join('\n')}</asset><worldbody>${bodies}</worldbody><actuator>${motors.join('\n')}</actuator><equality>${equalities.join('\n')}</equality></mujoco>`;
-    a.files.set('model.xml',text);m.note('MJCF uses unit-gear torque motors; controllers and simulation settings are not reconstructed. / MJCF 使用单位传动比力矩电机，不重建原控制器与仿真设置。');return {entry:'model.xml',files:a.files};
+    a.files.set('model.xml',formattedXML(text));m.note('MJCF uses unit-gear torque motors; controllers and simulation settings are not reconstructed. / MJCF 使用单位传动比力矩电机，不重建原控制器与仿真设置。');return {entry:'model.xml',files:a.files};
   }
   function writeUSD(m){
     const root=validate(m),w=worlds(m),paths=new Map(),safe=s=>s.replace(/[^a-zA-Z0-9_]/g,'_'),str=JSON.stringify,tuple=a=>'('+a.map(v=>Number(Math.abs(v)<1e-12?0:v.toPrecision(10))).join(', ')+')',rotation=matrix=>{const q=quaternion(matrix);return tuple([q.w,q.x,q.y,q.z]);};
-    const lines=['#usda 1.0','(defaultPrim = "Robot"\nmetersPerUnit = 1\nkilogramsPerUnit = 1\nupAxis = "Z")','def Xform "Robot" (prepend apiSchemas = ["PhysicsArticulationRootAPI"]) {',`custom string urdf:modelName = ${str(m.name)}`,`custom string urdf:rootLink = ${str(root)}`,'def Xform "Links" {'];
+    const lines=['#usda 1.0','(','defaultPrim = "Robot"','metersPerUnit = 1','kilogramsPerUnit = 1','upAxis = "Z"',')','','def Xform "Robot" (prepend apiSchemas = ["PhysicsArticulationRootAPI"]) {',`custom string urdf:modelName = ${str(m.name)}`,`custom string urdf:rootLink = ${str(root)}`,'def Xform "Links" {'];
     let i=0;for(const l of m.links.values()){
       const name='L'+i+++'_'+safe(l.name);paths.set(l.name,'/Robot/Links/'+name);lines.push(`def Xform ${str(name)} (prepend apiSchemas = ["PhysicsRigidBodyAPI"${l.mass>0?', "PhysicsMassAPI"':''}]) {`,`custom string urdf:name = ${str(l.name)}`,`double3 xformOp:translate = ${tuple(xyz(w.get(l.name)))}`,`quatf xformOp:orient = ${rotation(w.get(l.name))}`,'uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient"]');
       const floating=m.joints.find(j=>j.child===l.name&&j.kind==='floating');if(floating)lines.push(`custom string urdf:floatingJointName = ${str(floating.name)}`);
       if(l.mass>0){const p=principal(l.inertia);if(p.values.some(v=>v<0))throw Error('Nonphysical inertia: '+l.name);lines.push(`float physics:mass = ${l.mass}`,`point3f physics:centerOfMass = ${tuple(l.com)}`,`float3 physics:diagonalInertia = ${tuple(p.values)}`,`quatf physics:principalAxes = ${tuple([p.q.w,p.q.x,p.q.y,p.q.z])}`);}else lines.push('bool physics:kinematicEnabled = true');
       for(const [role,shapes] of [['visual',l.visuals],['collision',l.collisions]])for(const [k,s] of shapes.entries()){
-        const mesh=geometryMesh(s);lines.push(`def Mesh "${role}_${k}"${role==='collision'?' (prepend apiSchemas = ["PhysicsCollisionAPI"])':''} {`,`point3f[] points = [${mesh.points.map(p=>tuple(point(s.pose,p))).join(', ')}]`,`int[] faceVertexCounts = [${mesh.faces.map(()=>3).join(', ')}]`,`int[] faceVertexIndices = [${mesh.faces.flat().join(', ')}]`,'uniform token subdivisionScheme = "none"',`color3f[] primvars:displayColor = [${tuple(s.color.slice(0,3))}]`,`float[] primvars:displayOpacity = [${s.color[3]}]`,`custom string urdf:role = "${role}"`);if(role==='collision')lines.push('token visibility = "invisible"');lines.push('}');
+        const mesh=geometryMesh(s);lines.push(`def Mesh "${role}_${k}"${role==='collision'?' (prepend apiSchemas = ["PhysicsCollisionAPI"])':''} {`);
+        for(const [property,values] of [['point3f[] points',mesh.points.map(p=>tuple(point(s.pose,p)))],['int[] faceVertexCounts',mesh.faces.map(()=>'3')],['int[] faceVertexIndices',mesh.faces.flat().map(String)]])for(const row of usdArray(property,values))lines.push(row);
+        lines.push('uniform token subdivisionScheme = "none"',`color3f[] primvars:displayColor = [${tuple(s.color.slice(0,3))}]`,`float[] primvars:displayOpacity = [${s.color[3]}]`,`custom string urdf:role = "${role}"`);if(role==='collision')lines.push('token visibility = "invisible"');lines.push('}');
       }lines.push('}');
     }
     lines.push('}','def Xform "Joints" {');
@@ -305,7 +332,7 @@
     for(const [index,j] of m.joints.entries()){if(j.kind==='floating')continue;const align=pose([0,0,0],new T.Quaternion().setFromUnitVectors(V([1,0,0]),V(j.axis).normalize()));lines.push(`def ${j.kind==='fixed'?'PhysicsFixedJoint':j.kind==='prismatic'?'PhysicsPrismaticJoint':'PhysicsRevoluteJoint'} "J${index}_${safe(j.name)}" {`,`custom string urdf:name = ${str(j.name)}`,`rel physics:body0 = <${paths.get(j.parent)}>`,`rel physics:body1 = <${paths.get(j.child)}>`,...frames(product(j.pose,align),align));
       if(j.kind!=='fixed'){lines.push('uniform token physics:axis = "X"');if(j.kind!=='continuous'){const f=j.kind==='prismatic'?1:180/Math.PI;lines.push(`float physics:lowerLimit = ${j.lower*f}`,`float physics:upperLimit = ${j.upper*f}`);}for(const key of ['velocity','effort','damping','friction'])lines.push(`custom double urdf:${key} = ${j[key]}`);if(j.mimic)lines.push(`custom string urdf:mimic = ${str(JSON.stringify(j.mimic))}`);}lines.push('}');
     }
-    lines.push('def PhysicsFixedJoint "WorldAnchor" {',`custom string urdf:name = "__world_anchor"`,`rel physics:body1 = <${paths.get(root)}>`,...frames(I(),I()),'}','}','}');m.note('USD export is text .usda with standard UsdPhysics schemas; controllers and simulator tuning are not transferred. / USD 导出为标准 UsdPhysics 文本 .usda，不迁移控制器和仿真器调参。');return {entry:'model.usda',files:new Map([['model.usda',lines.join('\n')+'\n']])};
+    lines.push('def PhysicsFixedJoint "WorldAnchor" {',`custom string urdf:name = "__world_anchor"`,`rel physics:body1 = <${paths.get(root)}>`,...frames(I(),I()),'}','}','}');m.note('USD export is text .usda with standard UsdPhysics schemas; controllers and simulator tuning are not transferred. / USD 导出为标准 UsdPhysics 文本 .usda，不迁移控制器和仿真器调参。');return {entry:'model.usda',files:new Map([['model.usda',formattedUSD(lines)]])};
   }
   // ZIP STORE is supported by browsers and standard unzip tools; no CDN dependency.
   function zip(files){

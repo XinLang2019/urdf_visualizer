@@ -37,6 +37,20 @@ def compare_native(client,files,entry,joint=None):
 
 
 def check_browser_cases(client):
+    # XML entities and USD string punctuation must survive source formatting.
+    name='Robot "[{}]" & <test>'
+    from xml.sax.saxutils import quoteattr
+    source='<robot name='+quoteattr(name)+'><link name="base"><visual><geometry><box size=".2 .3 .4"/></geometry></visual></link></robot>'
+    for target in ['urdf','mjcf','usd']:
+        expression='''(async()=>{const file=new File([INPUT],'robot.urdf');const r=await URDFBrowserFormats.process('convert','robot.urdf',new Map([['robot.urdf',file]]),TARGET);const bytes=new Uint8Array(await r.arrayBuffer());return btoa(String.fromCharCode(...bytes))})()'''
+        packed=base64.b64decode(client.js(expression.replace('INPUT',json.dumps(source)).replace('TARGET',json.dumps(target))))
+        with zipfile.ZipFile(io.BytesIO(packed)) as archive:
+            entry=json.loads(archive.read('conversion-report.json'))['entry']
+            result=browser_import(client,{entry:archive.read(entry).decode()},entry)
+        assert 'error' not in result,result
+        import xml.etree.ElementTree as ET
+        assert ET.fromstring(result['urdf']).get('name')==name
+    print('PASS formatted URDF, MJCF and USDA preserve XML entities, quoted strings, brackets and braces',flush=True)
     mjcf='''<mujoco model="frames"><compiler angle="degree"/><default><geom density="500" rgba=".2 .4 .6 1"/><default class="leg"><joint damping=".2"/><geom size=".1 .2 .3"/></default></default><include file="parts/bodies.xml"/></mujoco>'''
     bodies='''<mujocoinclude><worldbody><body name="base" pos=".1 .2 .7" euler="10 20 30"><geom type="box" size=".1 .15 .2"/><body name="arm" pos=".2 .1 .3" childclass="leg" euler="5 15 20"><joint name="hinge" type="hinge" axis=".2 1 .3" pos=".04 .02 -.1" range="-60 70" ref="10"/><geom type="box" pos=".03 .1 -.2" euler="20 30 40"/><body name="tip" pos=".1 .2 -.3"><geom type="sphere" size=".04" mass=".3"/></body></body></body></worldbody></mujocoinclude>'''
     compare_native(client,{'robot.xml':mjcf,'parts/bodies.xml':bodies},'robot.xml','hinge')

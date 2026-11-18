@@ -13,6 +13,30 @@ from model_interaction import rendered_frame
 
 BROWSER_FORMATS=os.environ.get('URDF_TEST_BROWSER_FORMATS')=='1'
 
+def verify_readable_export(package):
+    """Downloaded source is readable, including large inline mesh arrays."""
+    import xml.etree.ElementTree as ET
+    for name,data in package.items():
+        if name not in ['model.urdf','model.xml','model.usda']:continue
+        text=data.decode()
+        assert text.endswith('\n') and '\t' not in text
+        if name.endswith('.usda'):
+            assert '\n    metersPerUnit = 1\n' in text
+            assert '\n    def Xform "Links" {\n        def Xform ' in text
+            assert '\n                point3f[] points = [\n                    (' in text
+            # Numeric mesh rows are wrapped; a dense mesh must not become one huge line.
+            rows=[line for line in text.splitlines() if line.startswith(' '*20)]
+            assert rows and max(map(len,rows))<=120
+        else:
+            root=ET.fromstring(text)
+            def nesting(node,depth=0):
+                if len(node):
+                    assert node.text=='\n'+'  '*(depth+1),(name,node.tag,node.text)
+                    for child in node:nesting(child,depth+1)
+                    assert node[-1].tail=='\n'+'  '*depth
+            nesting(root)
+
+
 def verify_browser_package(package):
     """Independent native SDKs check browser-generated files and physical frames."""
     import model_formats as formats
@@ -36,8 +60,17 @@ def verify_browser_package(package):
 
 
 def import_files(client,files,expected):
-    data=[[path,base64.b64encode(value if isinstance(value,bytes) else value.encode()).decode()] for path,value in files.items()]
-    client.js('''(()=>{window.beforeFormatImport=urdfWorkbench.viewer.robot;const d=new DataTransfer();for(const[path,data]of FILES){const bytes=Uint8Array.from(atob(data),c=>c.charCodeAt(0));const f=new File([bytes],path.split('/').pop());Object.defineProperty(f,'webkitRelativePath',{value:path});d.items.add(f);}const input=document.getElementById('folder-input');input.files=d.files;input.dispatchEvent(new Event('change'));})()'''.replace('FILES',json.dumps(data)))
+    # Formatted Go2 USDA exceeds DevTools' 100 MiB message limit when base64 encoded.
+    # Transfer chunks, then upload the same complete File through the real folder input.
+    client.js('window.formatUploadFiles=[]')
+    for path,value in files.items():
+        data=value if isinstance(value,bytes) else value.encode()
+        client.js('window.formatUploadChunks=[]')
+        for offset in range(0,len(data),1024*1024):
+            chunk=base64.b64encode(data[offset:offset+1024*1024]).decode()
+            client.js('formatUploadChunks.push(Uint8Array.from(atob('+json.dumps(chunk)+'),c=>c.charCodeAt(0)))')
+        client.js('''(()=>{const path=PATH,f=new File(formatUploadChunks,path.split('/').pop());Object.defineProperty(f,'webkitRelativePath',{value:path});formatUploadFiles.push(f);delete window.formatUploadChunks})()'''.replace('PATH',json.dumps(path)))
+    client.js('''(()=>{window.beforeFormatImport=urdfWorkbench.viewer.robot;const d=new DataTransfer();for(const f of formatUploadFiles)d.items.add(f);delete window.formatUploadFiles;const input=document.getElementById('folder-input');input.files=d.files;input.dispatchEvent(new Event('change'));})()''')
     client.until('urdfWorkbench.viewer.robot!==beforeFormatImport && urdfWorkbench.viewer.robot?.robotName==='+json.dumps(expected)+' && !urdfWorkbench.loading',90)
     smoke.check(client,'!document.querySelector("#status.error")','native import loads geometry without failed asset requests: '+expected)
     rendered_frame(client)
@@ -57,7 +90,9 @@ def convert(client,target):
         result={name:archive.read(name) for name in archive.namelist() if name not in ['README.txt','conversion-report.json']}
         assert report['entry'] in result
         if target=='usd':assert result[report['entry']].startswith(b'#usda') if BROWSER_FORMATS else result[report['entry']][:8]==b'PXR-USDC'
-        if BROWSER_FORMATS:assert report['engine']=='browser'
+        if BROWSER_FORMATS:
+            assert report['engine']=='browser'
+            verify_readable_export(result)
     client.until('!document.getElementById("convert-model").disabled')
     return result,report
 
