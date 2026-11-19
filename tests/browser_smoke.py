@@ -142,7 +142,7 @@ def run(client, url, output):
     files.append(('demo/urdf/other.urdf', xml.replace('local_test', 'other_test')))
     client.js(script.replace('FILES', json.dumps(files)))
     client.until('!!document.querySelector("dialog[open]")')
-    check(client, 'document.querySelector("dialog[open]").querySelectorAll("button").length===2', 'multiple URDFs open a model picker')
+    check(client, 'document.querySelector("dialog[open]").querySelectorAll("button").length===3', 'multiple URDFs open a model picker')
     client.js('[...document.querySelector("dialog[open]").querySelectorAll("button")].find(button=>button.textContent.includes("other.urdf")).click()')
     client.until('urdfWorkbench.viewer.robot?.robotName==="other_test" && !urdfWorkbench.loading')
     check(client, 'document.querySelector("#file-tree .file-entry.selected").dataset.path==="demo/urdf/other.urdf"', 'model picker highlights the chosen source file')
@@ -153,6 +153,8 @@ def run(client, url, output):
     click(client, 'file-tools-toggle')
     check(client, 'getComputedStyle(document.querySelector(".import-area")).display!=="none"', 'loaded file panel can reopen import controls')
     click(client, 'file-tools-toggle')
+    # Interaction fixtures below have known absolute scene coordinates.
+    client.js('for(const axis of ["x","y","z"]){const i=document.getElementById("model-offset-"+axis);i.value=0;i.dispatchEvent(new Event("change"))}')
     check_model_interaction(client, output, check)
     check_helper_visuals(client, output, check)
     check_link_measurement(client, output, check)
@@ -165,6 +167,8 @@ def run(client, url, output):
     check_go2_support_fit(client, output, check)
     check_terrain_lifecycle(client, output, check)
     check_statics_analysis(client, output, check)
+    # Label camera fixtures also look at the absolute scene origin.
+    client.js('for(const axis of ["x","y","z"]){const i=document.getElementById("model-offset-"+axis);i.value=0;i.dispatchEvent(new Event("change"))}')
     check_statics_labels(client, output, check)
     check_editor_save(client, output, check)
     # A URDF with no visual geometry still leaves finite camera and ground values.

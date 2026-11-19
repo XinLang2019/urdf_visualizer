@@ -50,13 +50,17 @@
       }
       const document=new DOMParser().parseFromString(result.urdf,'application/xml');
       for(const mesh of document.querySelectorAll('mesh[filename]'))mesh.setAttribute('filename',prefix+mesh.getAttribute('filename'));
-      const text=new XMLSerializer().serializeToString(document),name=file.name.replace(/\.[^.]+$/,'')+'.viewer.urdf';
-      return {text,context:{...context,name,assets,originalFormat:format,originalName:file.name,formatReport:result.report,sourceFile:{name,handle:null,savedText:null,written:false}}};
+      const text=new XMLSerializer().serializeToString(document),workingName=file.name.replace(/\.[^.]+$/,'')+'.viewer.urdf';
+      // Keep native source identity separate from the URDF used by Three.js.
+      const sourceText=await file.text(),editable=format==='mjcf'||sourceText.trimStart().startsWith('#usda');
+      return {text,context:{...context,name:editable?file.name:workingName,workingName,assets,originalFormat:format,originalName:file.name,formatReport:result.report,
+        editorText:editable?sourceText.replace(/\r\n?/g,'\n'):text,nativeEditable:editable,
+        sourceFile:editable?context.sourceFile:{name:workingName,handle:null,savedText:null,written:false}}};
     }
     async bundle(text,context,{signal}={}){
       signal?.throwIfAborted();
       let entry=normalize(context?.path||context?.name||'model.urdf');
-      if(context?.originalFormat||!/\.(urdf|xml)$/i.test(entry))entry=normalize(entry.slice(0,entry.lastIndexOf('/')+1)+(context?.name||'model.viewer.urdf'));
+      if(context?.originalFormat||!/\.(urdf|xml)$/i.test(entry))entry=normalize(entry.slice(0,entry.lastIndexOf('/')+1)+(context?.workingName||'model.viewer.urdf'));
       const files=new Map();
       if(context?.assets){for(const [path,asset] of context.assets)if(asset.file)files.set(path,asset.file);}
       else if(context?.files){

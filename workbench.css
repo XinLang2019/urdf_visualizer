@@ -230,6 +230,22 @@ urdf-viewer canvas {
   overflow:hidden;
   border-radius:0 0 14px 14px;
 }
+.model-manager {padding:8px 10px;border-bottom:1px solid var(--line);flex-shrink:0;}
+.model-manager-row {display:flex;align-items:center;gap:6px;min-width:0;}
+.model-manager-row+.model-manager-row {margin-top:6px;}
+.model-manager select {min-width:0;width:100%;}
+.model-manager-row>select {flex:1;}
+.model-manager button {padding:4px 8px;min-height:28px;white-space:nowrap;}
+.model-show-all {display:flex;align-items:center;gap:4px;margin-right:auto;white-space:nowrap;font-size:12px;}
+.model-offsets {display:flex;gap:8px;}
+.model-offsets label {display:flex;align-items:center;gap:4px;min-width:0;font-size:12px;}
+.model-offsets input {width:100%;min-width:0;padding:4px;}
+#model-spacing {padding-top:8px;}
+#model-spacing p {font-size:11px;color:var(--muted);margin:6px 0;}
+.model-gap {display:flex;align-items:center;gap:4px;white-space:nowrap;font-size:11px;}
+.model-gap input {width:50px;padding:4px;}
+#model-distance {font-size:11px;color:var(--muted);margin-left:auto;}
+.workspace-sidebar.collapsed .model-manager {display:none;}
 .workspace-content>.panel {
   position:relative;
   inset:auto;

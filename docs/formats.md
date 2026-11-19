@@ -7,11 +7,11 @@ GitHub Pages 与普通静态服务可直接加载 **URDF、MJCF、文本 USDA**�
 ## 使用
 
 1. 选择内置模型，或加载完整模型文件夹，包括 MJCF include、网格等资源。
-2. MJCF / USDA 自动生成 **URDF 工作副本**，继续使用关节控制、测量、编辑、静力学等工具。原始文件不覆盖。
+2. MJCF / USDA 的原格式代码显示在编辑器中；内部转换为 URDF 用于关节控制、测量和静力学。修改后点击“重新加载”应用，或“保存”覆盖已授权的原文件。
 3. 文件栏选择 URDF、MJCF 或 USD，再点击“转换并下载”。在线版的 USD 输出为标准文本 **`model.usda`**。
 4. 解压 ZIP 后，保持模型文件与 `meshes/` 相邻；`conversion-report.json` 记录单位、转换差异与限制。
 
-转换使用当前编辑器的模型代码；滑块中的当前关节角度不作为模型零位写入。MJCF / USDA 的“导出 URDF 包”会一起打包工作副本与网格；原生 URDF 的“保存”仍覆盖已授权源文件。
+转换使用当前编辑器的模型代码；滑块中的当前关节角度不作为模型零位写入。URDF、MJCF 和文本 USDA 的“保存”均写入对应源文件；首次保存需选择并授权原文件。原生服务加载的二进制 USD 保留 URDF 工作副本与“导出 URDF 包”，不将 XML 写入二进制源文件。
 
 需要 CAD 装配时，选择 **STEP (.step)**；保留连杆层级、几何缩放及 URDF 零位装配位置，输出为毫米单位的静态三角面几何。[STEP 使用说明](step-export.md)。
 
@@ -49,7 +49,7 @@ python3 model_server.py --port 8080
 ## 验证
 
 ```bash
-# Edge + 普通静态服务器：六方向互转、网格、工作副本、关节与零 API 请求
+# Edge + 普通静态服务器：六方向互转、网格、原格式编辑、多模型、关节与零 API 请求
 URDF_TEST_BROWSER_FORMATS=1 CHROME_BIN=/usr/bin/microsoft-edge .venv-formats/bin/python tests/model_formats_browser.py
 # 原生模式
 CHROME_BIN=/usr/bin/microsoft-edge .venv-formats/bin/python tests/model_formats_browser.py
@@ -68,7 +68,7 @@ CHROME_BIN=/usr/bin/microsoft-edge python3 tests/browser_smoke.py
 
 **URDF / MJCF / text USDA loading and all six conversion directions work directly on GitHub Pages and ordinary static hosting.** Parsing, mesh conversion and ZIP generation run locally in your browser. No Python installation or model uploads.
 
-Load an example or a complete model folder. MJCF / USDA imports become explicit URDF working copies for the existing joint, measurement, editing and statics tools. Choose a target under **Convert format** and download a ZIP; online USD export is standard text **`model.usda`**. Keep the model and `meshes/` together and read `conversion-report.json`. Conversion uses editor source, not slider values as new model zero positions. **Export URDF ZIP** retains native sources; original URDF save-in-place behavior is unchanged.
+Load an example or a complete model folder. MJCF / USDA imports show their original source in the editor, with an internal URDF representation for joint, measurement and statics tools. Reload applies native code edits; Save writes the authorized original source. Choose a target under **Convert format** and download a ZIP; online USD export is standard text **`model.usda`**. Keep the model and `meshes/` together and read `conversion-report.json`. Conversion uses editor source, not slider values as new model zero positions. Binary USD in native mode retains the explicit URDF working copy and **Export URDF ZIP** action; it never writes XML into the binary source.
 
 Choose **STEP (.step)** for a static CAD assembly retaining the link tree, mesh scales and URDF zero-pose placements in millimetres. Mesh-derived geometry remains faceted. [STEP workflow and limits](step-export.md#english).
 

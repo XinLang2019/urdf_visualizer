@@ -157,10 +157,16 @@
     saveHint:['已保存到源文件','Saved to the source file'],
     newModel:['模型','Model']
   };
+  Object.assign(strings,{
+    showAllModels:['同时显示','Show all'],arrangeModels:['自动排列','Arrange'],modelPosition:['位置','Position'],
+    modelPositionHint:['相对参考模型原点的 XYZ 偏移（m）','XYZ offset from the reference model origin (m)'],modelGap:['排列间隙','Gap'],
+    modelOriginDistance:['原点距离','Origin distance']
+  });
   const nativeFormats=new URLSearchParams(location.search).get('formats')==='native';
   let lang = 'zh';
   const t = key => strings[key]?.[lang === 'zh' ? 0 : 1] || key;
   const state = { display:{visual:true,collision:false,inertia:false,com:false,axes:false,jointAxes:false,shadow:true,lighting:true,grid:true}, radians:true, limits:true, source:'', baseline:'', saving:false, context:null, version:0, selected:null, rows:new Map(), helpers:[], mobile:'files', activeTab:'files', sidebarCollapsed:false, editorOpen:innerWidth>1000 };
+  const models=[];let activeModel=null,modelSerial=0;
   const sourceFiles=new URDFSourceFiles(t);
   const modelFormats=new URDFModelFormats(t);
   if(nativeFormats)$('conversion-target').querySelector('[value="usd"]').textContent='USD (.usd)';
@@ -193,7 +199,14 @@
   const updateEnvironment=viewer._updateEnvironment.bind(viewer);
   viewer._updateEnvironment=()=>{
     if(!viewer.robot || objectBounds(viewer.robot).isEmpty())return;
-    updateEnvironment();
+    const target=viewer.controls.target.clone();updateEnvironment();
+    if($('models-show-all').checked&&models.length>1){
+      viewer.controls.target.copy(target);
+      const box=sceneModelBounds(),center=box.getCenter(new THREE.Vector3()),radius=box.getBoundingSphere(new THREE.Sphere()).radius;
+      viewer.plane.position.y=box.min.y-.001;
+      const light=viewer.directionalLight,offset=light.position.clone().sub(light.target.position);light.target.position.copy(center);light.position.copy(center).add(offset);
+      Object.assign(light.shadow.camera,{left:-radius,right:radius,top:radius,bottom:-radius});light.shadow.camera.updateProjectionMatrix();
+    }
     grid.position.y=viewer.plane.position.y+.002;
     statics?.syncTerrainEnvironment();
   };
@@ -269,7 +282,10 @@
     textures.forEach(texture=>texture.dispose()); geometries.forEach(geometry=>geometry.dispose()); materials.forEach(material=>{if(material!==viewer._collisionMaterial&&material!==viewer.highlightMaterial)material.dispose();}); object?.removeFromParent();
   }
   function normalize(path) { const out=[]; for(const part of decodeURIComponent(path).replace(/\\/g,'/').split('/')) {if(part==='..')out.pop();else if(part&&part!=='.')out.push(part);} return out.join('/'); }
-  function releaseContext(context) { for(const asset of new Set([...(context?.assets?.values()||[]),...(context?.meshOverrides?.values()||[])]))if(asset.url)URL.revokeObjectURL(asset.url); }
+  function releaseContext(context) {
+    const retained=new Set(models.flatMap(model=>[...(model.context?.assets?.values()||[]),...(model.context?.meshOverrides?.values()||[])].map(asset=>asset.url)));
+    for(const asset of new Set([...(context?.assets?.values()||[]),...(context?.meshOverrides?.values()||[])]))if(asset.url&&!retained.has(asset.url))URL.revokeObjectURL(asset.url);
+  }
   function resolveAsset(path, context) {
     if(context?.meshOverrides&&!/^(blob:|data:)/.test(path)){
       const key=normalize(new URL(path,location.href).pathname),matches=[...context.meshOverrides.entries()].filter(([name])=>key.endsWith('/'+name)||name.endsWith('/'+key));
@@ -298,13 +314,99 @@
     else if(['gltf','glb'].includes(extension))new loaders.GLTFLoader(manager).load(path,result=>finish(result.scene),undefined,onError);
     else {manager.itemError(path);finish(null,new Error(`Unsupported mesh: ${extension}`));}
   }
-  function hasEdits() { return state.saving || ($('source').value!==state.baseline && $('source').value!==state.context?.sourceFile?.savedText && $('source').value!==state.context?.sourceFile?.exportedText); }
-  async function loadText(text, context, {replaceEditor=true}={}) {
+  const edited=(text,baseline,source)=>text!==baseline&&text!==source?.savedText&&text!==source?.exportedText;
+  function hasEdits() { return state.saving || edited($('source').value,state.baseline,state.context?.sourceFile) || models.some(m=>m!==activeModel&&edited(m.draft,m.baseline,m.context.sourceFile)); }
+  function rememberModel() {
+    if(!activeModel)return;
+    Object.assign(activeModel,{context:state.context,source:state.source,xml:state.xml,baseline:state.baseline,helpers:state.helpers,
+      draft:$('source').value,filename:$('filename').value,scrollTop:$('source').scrollTop,scrollLeft:$('source').scrollLeft});
+  }
+  function sceneModelBounds(){const box=new THREE.Box3();for(const model of models)if(model.group.visible)box.union(objectBounds(model.robot));return box;}
+  function modelForLink(link){if(!link)return null;return models.find(model=>model.robot===link||Object.values(model.robot.links).includes(link));}
+  function refreshModelManager(){
+    $('model-manager').hidden=!models.length;
+    $('model-select').replaceChildren(...models.map((model,i)=>{const option=document.createElement('option');option.value=model.id;option.textContent=`${i+1} · ${model.context.name}`;return option;}));
+    $('model-select').value=activeModel?.id||'';
+    $('models-show-all').disabled=models.length<2;$('models-arrange').disabled=models.length<2;
+    const previous=$('model-reference').value,references=models.filter(m=>m!==activeModel);
+    $('model-reference').replaceChildren(...references.map(m=>{const option=document.createElement('option');option.value=m.id;option.textContent=m.context.name;return option;}));
+    if(references.some(m=>m.id===previous))$('model-reference').value=previous;
+    $('model-reference').disabled=!references.length;
+    const reference=models.find(m=>m.id===$('model-reference').value),origin=reference?.group.position||new THREE.Vector3();
+    for(const axis of ['x','y','z'])$('model-offset-'+axis).value=activeModel?Number((activeModel.group.position[axis]-origin[axis]).toFixed(6)):0;
+    const distance=activeModel?activeModel.group.position.distanceTo(origin):0;
+    $('model-distance').textContent=`${t('modelOriginDistance')}: ${distance.toFixed(3)} m`;
+  }
+  function refreshModelVisibility(){
+    for(const model of models)model.group.visible=$('models-show-all').checked||model===activeModel;
+    refreshModelManager();applyDisplay();viewer._updateEnvironment();viewer.redraw();
+  }
+  function arrangeModels(){
+    let edge=null;const gap=Number($('model-gap').value);
+    if(!Number.isFinite(gap)||gap<0)return;
+    // Offsets are expressed in model/world XYZ before the viewer's up-axis rotation.
+    for(const model of models){
+      model.group.position.set(0,0,0);viewer.world.updateWorldMatrix(true,true);
+      const box=objectBounds(model.robot).applyMatrix4(viewer.world.matrixWorld.clone().invert());
+      if(edge!==null)model.group.position.x=edge+gap-(box.isEmpty()?-.5:box.min.x);
+      edge=model.group.position.x+(box.isEmpty()?.5:box.max.x);
+    }
+    refreshModelVisibility();fitView();statics?.modelChanged();
+  }
+  function clearActiveTools(){resetModelPointer();clearJointAngleUI();cancelLinkNavigation();clearMeasurement();clearSelection();}
+  function activateModel(model,{fit=!$('models-show-all').checked}={}){
+    if(!model||model===activeModel||state.saving)return;
+    conversionController?.abort();rememberModel();clearActiveTools();++state.version;
+    activeModel=model;viewer.robot=model.robot;state.context=model.context;state.source=model.source;state.xml=model.xml;state.baseline=model.baseline;state.helpers=model.helpers;
+    $('source').value=model.draft;$('filename').value=model.filename;$('editor-error').hidden=true;
+    viewer._setIgnoreLimits(!state.limits);meshSimplifier.setContext(state.context);
+    buildHierarchy();buildFileTree();buildJoints();buildTree();refreshModelVisibility();updateEditor();statics?.modelChanged();
+    $('source').scrollTop=model.scrollTop||0;$('source').scrollLeft=model.scrollLeft||0;syncEditorScroll();
+    const linkCount=Object.keys(model.robot.links).length,jointCount=Object.keys(model.robot.joints).length;
+    $('model-name').textContent=model.robot.robotName||model.context.name;$('model-name').title=model.context.name;
+    $('model-meta').textContent=`${linkCount} ${t('linkTotal')} · ${jointCount} ${t('jointTotal')}`;$('structure-count').textContent=`${linkCount} / ${jointCount}`;
+    status(`${t('modelLoaded')} · ${model.context.name}`);if(fit)fitView();
+  }
+  $('model-select').onchange=()=>activateModel(models.find(m=>m.id===$('model-select').value),{fit:!$('models-show-all').checked});
+  $('models-show-all').onchange=()=>{refreshModelVisibility();fitView();};
+  $('models-arrange').onclick=arrangeModels;
+  $('model-reference').onchange=refreshModelManager;
+  $('model-add').onclick=()=>pickLocal(false);
+  $('model-spacing-toggle').onclick=()=>{const open=$('model-spacing').hidden;$('model-spacing').hidden=!open;$('model-spacing-toggle').setAttribute('aria-expanded',String(open));};
+  for(const axis of ['x','y','z'])$('model-offset-'+axis).onchange=()=>{
+    const input=$('model-offset-'+axis),value=Number(input.value);if(!activeModel||input.value===''||!Number.isFinite(value)){refreshModelManager();return;}
+    clearMeasurement();clearJointAngleUI();const reference=models.find(m=>m.id===$('model-reference').value);activeModel.group.position[axis]=value+(reference?.group.position[axis]||0);refreshModelManager();viewer._updateEnvironment();viewer.redraw();statics?.modelChanged();
+  };
+  $('model-remove').onclick=()=>{
+    if(!activeModel||state.saving)return;
+    rememberModel();
+    if(edited(activeModel.draft,activeModel.baseline,activeModel.context.sourceFile)){status(t('unsaved'),'error');return;}
+    const removed=activeModel,index=models.indexOf(removed);
+    // Switch before releasing objects so selection, dragging and overlays finish cleanly.
+    if(models.length>1){activateModel(models[index===0?1:index-1]);models.splice(index,1);dispose(removed.group);if(!models.some(m=>m.context.assets===removed.context.assets))releaseContext(removed.context);refreshModelVisibility();fitView();}
+    else{
+      clearActiveTools();models.splice(index,1);activeModel=null;dispose(removed.group);releaseContext(removed.context);
+      viewer.robot=null;state.context=null;state.source='';state.xml=null;state.helpers=[];state.rows.clear();state.baseline='';++state.version;
+      $('source').value='';$('filename').value='newfile.urdf';document.body.classList.remove('model-loaded');$('files-panel').classList.remove('has-model','show-import');
+      for(const id of ['loaded-file','file-tree','file-tools-toggle','joint-content','structure-count','tree','selection-info'])$(id).hidden=true;
+      for(const id of ['joints-empty','structure-empty'])$(id).hidden=false;
+      $('file-tree').replaceChildren();$('joint-list').replaceChildren();$('tree').replaceChildren();$('graph-measure').disabled=true;
+      meshSimplifier.setContext(null);refreshModelManager();updateEditor();statics?.modelChanged();viewer.redraw();status(t('ready'));
+    }
+  };
+  async function editorWorking(text,context=state.context){
+    if(!context?.nativeEditable){validate(text);return {text,context};}
+    const assets=new Map(context.assets),file=new File([text],context.originalName,{type:'text/plain'});
+    assets.set(context.path,{...context.sourceFile,file,url:null});
+    const prepared=await modelFormats.prepare(file,{...context,assets});validate(prepared.text);
+    return {text:prepared.text,context:{...prepared.context,sourceFile:context.sourceFile,editorText:text}};
+  }
+  async function loadText(text, context, {replaceEditor=true,replaceModel=context===state.context}={}) {
     text=text.replace(/\r\n?/g,'\n');
     const xml=validate(text);
     conversionController?.abort();
     context.sourceFile ||= {name:context.name,handle:null,savedText:null,written:false};
-    const version=++state.version;
+    const version=++state.version,previousContext=state.context;
     status(t('loading'),'loading'); $('editor-error').hidden=true;
     const failures=new Set();
     const manager=new THREE.LoadingManager();
@@ -322,18 +424,21 @@
     await ready;
     if(version!==state.version){dispose(robot);return false;}
     // Swap only after XML and meshes finish. Invalid edits retain the current model.
-    resetModelPointer();clearJointAngleUI();cancelLinkNavigation();clearMeasurement(); clearSelection();
-    state.helpers.forEach(helper=>dispose(helper.object)); state.helpers=[];
-    dispose(viewer.robot);
-    const oldContext=state.context;
-    viewer.robot=robot;viewer.world.visible=true;viewer.world.add(robot);
+    rememberModel();clearActiveTools();
+    if(replaceModel&&activeModel){state.helpers.forEach(helper=>dispose(helper.object));dispose(activeModel.robot);}
+    else{
+      const group=new THREE.Group();viewer.world.add(group);
+      activeModel={id:String(++modelSerial),group};models.push(activeModel);
+    }
+    state.helpers=[];activeModel.robot=robot;
+    viewer.robot=robot;viewer.world.visible=true;activeModel.group.add(robot);
     robot.traverse(child=>{if(child.isMesh){child.castShadow=true;child.receiveShadow=true;const mats=Array.isArray(child.material)?child.material:[child.material];mats.forEach(mat=>{if(mat?.map)mat.map.colorSpace=THREE.SRGBColorSpace;});}});
     viewer._setIgnoreLimits(!state.limits);
     state.context=context;state.source=text;state.xml=xml;
     meshSimplifier.setContext(context);
-    if(oldContext?.assets!==context?.assets)releaseContext(oldContext);
-    if(replaceEditor){$('source').value=text;$('filename').value=context.name;state.baseline=text;}
-    else state.baseline=text;
+    const editorText=context.editorText??text;
+    if(replaceEditor){$('source').value=editorText;$('filename').value=context.name;}
+    state.baseline=editorText;
     document.body.classList.add('model-loaded');
     $('files-panel').classList.add('has-model');$('loaded-file').hidden=false;
     $('model-name').textContent=robot.robotName || xml.documentElement.getAttribute('name') || context.name;
@@ -343,19 +448,30 @@
     $('joints-empty').hidden=true;$('joint-content').hidden=false;$('structure-empty').hidden=true;
     $('structure-count').hidden=false;$('structure-count').textContent=`${linkCount} / ${jointCount}`;
     $('graph-measure').disabled=false;
-    buildHierarchy();buildFileTree();buildJoints();buildTree();buildHelpers();applyDisplay();fitView();updateEditor();statics?.modelChanged();
+    buildHierarchy();buildFileTree();buildJoints();buildTree();buildHelpers();rememberModel();
+    if(replaceModel&&previousContext?.assets!==context.assets)releaseContext(previousContext);
+    if(!replaceModel&&models.length>1){
+      const inverse=viewer.world.matrixWorld.clone().invert(),box=objectBounds(robot).applyMatrix4(inverse),others=new THREE.Box3();
+      for(const model of models)if(model!==activeModel)others.union(objectBounds(model.robot).applyMatrix4(inverse));
+      const gap=Number($('model-gap').value);
+      activeModel.group.position.x=(others.isEmpty()?0:others.max.x)+(Number.isFinite(gap)&&gap>=0?gap:.5)-(box.isEmpty()?-.5:box.min.x);
+    }
+    refreshModelVisibility();
+    fitView();updateEditor();statics?.modelChanged();
     $('conversion-status').textContent='';$('conversion-status').removeAttribute('data-i18n');$('conversion-status').classList.remove('error');
     if(failures.size){status(`${t('meshMissing')} · ${failures.size}`, 'error');$('editor-error').textContent=`${t('meshMissing')}: ${[...failures].map(p=>decodeURIComponent(p)).join('\n')}`;$('editor-error').hidden=false;}
     else status(`${t('modelLoaded')} · ${context.name}`);
     return true;
   }
   async function nativeContext(file,context) {
+    context.sourceFile ||= context.assets?.get(context.path)||sourceFiles.fromFile(file);
+    await sourceFiles.read(context.sourceFile);
     const prepared=await modelFormats.prepare(file,context);
     return prepared.context.originalFormat?{...prepared.context,workingText:prepared.text}:prepared.context;
   }
   let catalogPromise;
   async function loadExample() {
-    if(hasEdits())return status(t('unsaved'),'error');
+    if(state.saving)return;
     const path=$('example-select').value;
     if(!path)return status(t('chooseFirst'),'error');
     if(location.protocol==='file:')return fail(new Error(t('localServerRequired')));
@@ -393,10 +509,10 @@
     if(!candidates.length)throw new Error(t('noUrdf'));
     if(candidates.length===1)return candidates[0];
     const dialog=document.createElement('dialog'), heading=document.createElement('h3');heading.textContent=t('fileChoice');dialog.append(heading);
-    return new Promise(resolve=>{for(const file of candidates){const button=document.createElement('button');button.textContent=file.webkitRelativePath || file._relativePath || file.name;button.style.cssText='display:block;width:100%;margin:8px 0;white-space:normal;overflow-wrap:anywhere';button.onclick=()=>{dialog.close();dialog.remove();resolve(file);};dialog.append(button);}dialog.addEventListener('cancel',()=>{dialog.remove();resolve(null);});document.body.append(dialog);dialog.showModal();});
+    return new Promise(resolve=>{for(const file of candidates){const button=document.createElement('button');button.textContent=file.webkitRelativePath || file._relativePath || file.name;button.style.cssText='display:block;width:100%;margin:8px 0;white-space:normal;overflow-wrap:anywhere';button.onclick=()=>{dialog.close();dialog.remove();resolve(file);};dialog.append(button);}const all=document.createElement('button');all.textContent=lang==='zh'?'加载全部模型':'Load all models';all.className='active';all.style.cssText='width:100%;margin-top:12px';all.onclick=()=>{dialog.close();dialog.remove();resolve(candidates);};dialog.append(all);dialog.addEventListener('cancel',()=>{dialog.remove();resolve(null);});document.body.append(dialog);dialog.showModal();});
   }
   async function importFiles(files) {
-    if(hasEdits())return status(t('unsaved'),'error');
+    if(state.saving)return;
     let context;
     try {
       const models=files.filter(file=>URDFModelFormats.isModel(file.name));
@@ -405,17 +521,23 @@
         const assets=new Map(files.map(file=>[normalize(file.webkitRelativePath||file._relativePath||file.name),sourceFiles.fromFile(file)]));
         meshSimplifier.setContext({assets});status(meshSimplifier.t('loaded'));return;
       }
-      const file=await chooseUrdf(files);if(!file)return;
-      const version=++state.version,editorBefore=$('source').value;
-      status(t('loading'),'loading');
+      const choice=await chooseUrdf(files);if(!choice)return;
+      const selected=Array.isArray(choice)?choice:[choice];
       const assets=new Map(files.map(file=>[normalize(file.webkitRelativePath || file._relativePath || file.name),sourceFiles.fromFile(file)]));
-      const path=normalize(file.webkitRelativePath || file._relativePath || file.name);
-      context={name:file.name,path,assets,sourceFile:assets.get(path),base:new URL(`/__local__/${path.slice(0,path.lastIndexOf('/')+1)}`,location.href).href};
-      context=await nativeContext(file,context);
-      if(version!==state.version){releaseContext(context);return;}
-      if($('source').value!==editorBefore)throw Error(t('unsaved'));
-      if(context.originalFormat){viewer.up='+Z';$('up-select').value='+Z';}
-      const loaded=await loadText(context.workingText || await sourceFiles.read(context.sourceFile),context);if(!loaded)releaseContext(context);
+      let expectedVersion=state.version;
+      for(const file of selected){
+        if(expectedVersion!==state.version)return;
+        const version=++state.version,editorBefore=$('source').value;status(t('loading'),'loading');
+        const path=normalize(file.webkitRelativePath || file._relativePath || file.name);
+        context={name:file.name,path,assets,sourceFile:assets.get(path),base:new URL(`/__local__/${path.slice(0,path.lastIndexOf('/')+1)}`,location.href).href};
+        context=await nativeContext(file,context);
+        if(version!==state.version){releaseContext(context);return;}
+        if($('source').value!==editorBefore)throw Error(t('unsaved'));
+        if(context.originalFormat){viewer.up='+Z';$('up-select').value='+Z';}
+        const loaded=await loadText(context.workingText || await sourceFiles.read(context.sourceFile),context);
+        if(!loaded){releaseContext(context);return;}expectedVersion=state.version;
+      }
+      if(selected.length>1){$('models-show-all').checked=true;refreshModelVisibility();fitView();}
     }catch(error){if(context!==state.context)releaseContext(context);fail(error);}
   }
   async function readEntry(entry, prefix='') {
@@ -426,7 +548,7 @@
   }
   $('load-example').onclick=loadExample;
   async function pickLocal(folder) {
-    if(hasEdits())return status(t('unsaved'),'error');
+    if(state.saving)return;
     if(!(folder?window.showDirectoryPicker:window.showOpenFilePicker))return $(folder?'folder-input':'file-input').click();
     try {await importFiles(await (folder?sourceFiles.pickDirectory():sourceFiles.pickFiles()));}
     catch(error){if(error.name!=='AbortError')fail(error);}
@@ -443,7 +565,7 @@
     // Capture handles and fallback entries in the drop event before awaiting anything.
     const handles=items.map(item=>item.getAsFileSystemHandle?.()||Promise.resolve(null));
     const entries=items.map(item=>item.webkitGetAsEntry?.()).filter(Boolean),fallback=[...event.dataTransfer.files];
-    if(hasEdits())return status(t('unsaved'),'error');
+    if(state.saving)return;
     try {
       const resolved=await Promise.all(handles.map(p=>p.catch(()=>null)));
       const files=resolved.length&&resolved.every(Boolean)?(await Promise.all(resolved.map(h=>sourceFiles.readHandle(h)))).flat():entries.length?(await Promise.all(entries.map(entry=>readEntry(entry)))).flat():fallback;
@@ -467,7 +589,9 @@
   }
   async function openTreeFile(path) {
     if(path===filePath(state.context))return;
-    if(hasEdits())return status(t('unsaved'),'error');
+    const existing=models.find(m=>filePath(m.context)===path&&(m.context.assets?.get(path)?.file===state.context.assets?.get(path)?.file));
+    if(existing){activateModel(existing);return;}
+    if(state.saving)return;
     const context=sourceContext(path,state.context);
     try {
       let text;
@@ -775,10 +899,10 @@
     return null;
   }
   function visibleModelHit(raycaster) {
-    if(!viewer.robot || !visibleInScene(viewer.robot))return null;
+    if(!viewer.robot)return null;
     viewer.world.updateWorldMatrix(true,true);
     const hits=[];
-    viewer.robot.traverseVisible(object=>{
+    for(const model of models.filter(m=>visibleInScene(m.robot)))model.robot.traverseVisible(object=>{
       if(!object.isMesh || !raycaster.layers.test(object.layers))return;
       let surface=object.parent;
       while(surface && !surface.isURDFVisual && !surface.isURDFCollider && surface!==viewer.robot)surface=surface.parent;
@@ -866,6 +990,16 @@
     locatedSource=null;$('source-locate-highlight').hidden=true;
   }
   function linkSourceRange(text,name) {
+    if(state.context?.nativeEditable&&state.context.originalFormat==='usd'){
+      const escaped=name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),match=new RegExp('\\bdef\\s+\\w+\\s+"'+escaped+'"').exec(text);
+      if(!match)return null;
+      // Braces inside strings and comments do not delimit a USD prim.
+      const tokens=/#[^\n]*|"(?:\\.|[^"\\])*"|[{}]/g;tokens.lastIndex=match.index+match[0].length;
+      let depth=0,started=false,token;
+      while((token=tokens.exec(text))){if(token[0]==='{'){depth++;started=true;}else if(token[0]==='}'&&started&&!--depth)return {start:match.index,end:tokens.lastIndex};}
+      return null;
+    }
+    const nativeBody=state.context?.nativeEditable&&state.context.originalFormat==='mjcf',wanted=nativeBody?'body':'link';
     // Tokenize tags with quoted attributes intact; comments and CDATA never name links.
     const tokens=/<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\?[\s\S]*?\?>|<![^>]*>|<\/?[\w:.-]+\b(?:[^>"']|"[^"]*"|'[^']*')*>/g;
     let depth=0,start=null;
@@ -874,13 +1008,13 @@
       const tag=token.match(/^<(\/?)([\w:.-]+)/),closing=!!tag[1],kind=tag[2],empty=/\/\s*>$/.test(token);
       if(closing) {
         depth--;
-        if(start!==null && depth===1 && kind==='link')return {start,end:match.index+token.length};
+        if(start!==null && depth===start.depth && kind===wanted)return {start:start.index,end:match.index+token.length};
       }else{
-        if(depth===1 && kind==='link') {
+        if((nativeBody||depth===1) && kind===wanted) {
           const element=new DOMParser().parseFromString(token.replace(/\/?\s*>$/,'/>'),'application/xml').documentElement;
-          if(element.tagName==='link' && element.getAttribute('name')===name) {
+          if(element.tagName===wanted && element.getAttribute('name')===name) {
             if(empty)return {start:match.index,end:match.index+token.length};
-            start=match.index;
+            start={index:match.index,depth};
           }
         }
         if(!empty)depth++;
@@ -962,8 +1096,14 @@
       this.hitDistance=hit?.distance ?? -1;
       if(hit)this.initialGrabPoint.copy(hit.point);
       setHoveredLink(hit?.link || null);
-      updateJointHover(lastModelPointer?.ctrlKey || lastModelPointer?.metaKey || linkMeasurement.pinned?null:nearestMovableJoint(hit?.link));
+      updateJointHover(modelForLink(hit?.link)!==activeModel || lastModelPointer?.ctrlKey || lastModelPointer?.metaKey || linkMeasurement.pinned?null:nearestMovableJoint(hit?.link));
     };
+    // Activate before measurement and manipulation handlers read viewer.robot.
+    viewer.addEventListener('pointerdown',event=>{
+      if(event.target!==canvas||event.button!==0||state.saving)return;
+      const hit=visibleModelHit(rayFromPointer(event)),model=modelForLink(hit?.link);
+      if(model&&model!==activeModel){activateModel(model);statics?.setRightView('code',false);}
+    },true);
     canvas.addEventListener('pointerdown',event=>{
       if(event.button!==0 || event.shiftKey || event.ctrlKey || event.metaKey || linkMeasurement.pinned)return;
       if(!event.isPrimary){resetModelPointer();return;}
@@ -1196,7 +1336,7 @@
   const originalVisualStyle=new WeakMap();
   function updateInspectionAppearance() {
     const inspecting=state.display.com || state.display.axes || state.display.jointAxes;
-    viewer.robot?.traverse(mesh=>{
+    for(const model of models)model.robot.traverse(mesh=>{
       if(!mesh.isMesh)return;
       let parent=mesh.parent;
       while(parent && !parent.isURDFVisual && parent!==viewer.robot)parent=parent.parent;
@@ -1230,7 +1370,16 @@
       const group=new THREE.Group();group.userData.markerKind='inertia';applyOrigin(group,origin);group.add(box);helper(group,'inertia',link);
     }
   }
-  function applyDisplay(){setHoveredLink(null);clearSurfaceSnap();const d=state.display;viewer.showCollision=d.collision;viewer.displayShadow=d.shadow;viewer.directionalLight.castShadow=d.shadow;viewer.plane.visible=d.shadow;grid.visible=d.grid;viewer.ambientLight.intensity=d.lighting?.65:1.8;viewer.directionalLight.intensity=d.lighting?Math.PI:0;viewer.robot?.traverse(child=>{if(child.isURDFVisual)child.visible=d.visual;});state.helpers.forEach(({object,kind})=>object.visible=d[kind] || (kind==='jointAxes' && (object.parent===activeDragJoint || (statics?.enabled && !object.userData.staticsInspectionHidden))));updateInspectionAppearance();refreshModelHover();viewer.redraw();statics?.requestProjection();}
+  function applyDisplay(){
+    setHoveredLink(null);clearSurfaceSnap();const d=state.display;
+    viewer.showCollision=d.collision;viewer.displayShadow=d.shadow;viewer.directionalLight.castShadow=d.shadow;viewer.plane.visible=d.shadow;grid.visible=d.grid;
+    viewer.ambientLight.intensity=d.lighting?.65:1.8;viewer.directionalLight.intensity=d.lighting?Math.PI:0;
+    for(const model of models){
+      model.robot.traverse(child=>{if(child.isURDFVisual)child.visible=d.visual;if(child.isURDFCollider){child.visible=d.collision;child.traverse(mesh=>{if(mesh.isMesh){mesh.material=viewer._collisionMaterial;mesh.castShadow=false;}});}});
+      model.helpers?.forEach(({object,kind})=>object.visible=d[kind] || (kind==='jointAxes' && model===activeModel && (object.parent===activeDragJoint || (statics?.enabled && !object.userData.staticsInspectionHidden))));
+    }
+    updateInspectionAppearance();refreshModelHover();viewer.redraw();statics?.requestProjection();
+  }
   $$('[data-display]').forEach(button=>button.onclick=()=>{const key=button.dataset.display;state.display[key]=!state.display[key];button.classList.toggle('active',state.display[key]);button.setAttribute('aria-pressed',String(state.display[key]));applyDisplay();});
   function updateCameraFrame() {
     let left=0,right=0,top=72,bottom=40;
@@ -1250,7 +1399,7 @@
     return {width:width/innerWidth,height:height/innerHeight};
   }
   function fitView() {
-    const box=viewer.robot?objectBounds(viewer.robot):new THREE.Box3(new THREE.Vector3(-.7,0,-.7),new THREE.Vector3(.7,1,.7));
+    const box=viewer.robot?sceneModelBounds():new THREE.Box3(new THREE.Vector3(-.7,0,-.7),new THREE.Vector3(.7,1,.7));
     const center=box.isEmpty()?new THREE.Vector3(0,.3,0):box.getCenter(new THREE.Vector3()), size=box.isEmpty()?1.5:box.getSize(new THREE.Vector3()).length();
     const available=updateCameraFrame();
     const distance=Math.max(size, .25)/(2*Math.tan(THREE.MathUtils.degToRad(viewer.camera.fov/2)))*Math.max(1.2,1/(viewer.camera.aspect*available.width),1/available.height);
@@ -1606,26 +1755,40 @@
     else {clearSurfaceSnap();refreshModelHover();}
   });
 
-  let highlightedSource=null;
+  let highlightedSource=null,editorLineStarts=[0],highlightSliceKey='',highlightLineOffset=0;
+  function editorLineAt(offset){
+    let lo=0,hi=editorLineStarts.length;while(lo+1<hi){const mid=(lo+hi)>>1;if(editorLineStarts[mid]<=offset)lo=mid;else hi=mid;}return lo;
+  }
   function highlightSource(text) {
-    if(highlightedSource===text)return;
-    highlightedSource=text;
-    const fragment=document.createDocumentFragment();
-    const tokens=/<!--[\s\S]*?(?:-->|$)|"[^"]*"|'[^']*'|<\?xml|<\/?[\w:.-]+|[A-Za-z_:][\w:.-]*(?=\s*=)|\?>|\/?>/g;
-    let end=0;
-    for(const match of text.matchAll(tokens)) {
-      if(match.index>end)fragment.append(document.createTextNode(text.slice(end,match.index)));
-      const value=match[0],span=document.createElement('span');
-      span.className=value.startsWith('<!--')?'xml-comment':/^["']/.test(value)?'xml-value':value.startsWith('<')||value.endsWith('>')?'xml-tag':'xml-attribute';
-      span.textContent=value;fragment.append(span);end=match.index+value.length;
+    if(highlightedSource!==text){
+      highlightedSource=text;editorLineStarts=[0];highlightSliceKey='';
+      for(let index=text.indexOf('\n');index!==-1;index=text.indexOf('\n',index+1))editorLineStarts.push(index+1);
     }
-    fragment.append(document.createTextNode(text.slice(end)+'\n'));
+    const source=$('source'),large=text.length>200000,lineHeight=19;
+    const first=large?Math.min(editorLineStarts.length-1,Math.max(0,Math.floor(source.scrollTop/lineHeight)-8)):0;
+    const last=large?Math.min(editorLineStarts.length,first+Math.ceil(source.clientHeight/lineHeight)+20):editorLineStarts.length;
+    const key=`${first}:${last}`;if(highlightSliceKey===key)return;highlightSliceKey=key;highlightLineOffset=first*lineHeight;
+    const visible=text.slice(editorLineStarts[first]||0,editorLineStarts[last]??text.length);
+    const fragment=document.createDocumentFragment(),usd=text.trimStart().startsWith('#usda');
+    const tokens=usd?/#[^\n]*|"(?:\\.|[^"\\])*"|\b(?:def|over|custom|uniform|float|double|int|token|string|bool|rel|true|false)\b|[-+]?\b\d+(?:\.\d+)?(?:e[-+]?\d+)?\b/g:/<!--[\s\S]*?(?:-->|$)|"[^"]*"|'[^']*'|<\?xml|<\/?[\w:.-]+|[A-Za-z_:][\w:.-]*(?=\s*=)|\?>|\/?>/g;
+    let end=0;
+    // Very long unformatted lines remain readable without creating millions of nodes.
+    if(visible.length>100000)fragment.append(document.createTextNode(visible+'\n'));
+    else{
+      for(const match of visible.matchAll(tokens)) {
+        if(match.index>end)fragment.append(document.createTextNode(visible.slice(end,match.index)));
+        const value=match[0],span=document.createElement('span');
+        span.className=value.startsWith('<!--')||usd&&value.startsWith('#')?'xml-comment':/^["']/.test(value)||usd&&/^[-+]?\d/.test(value)?'xml-value':usd||value.startsWith('<')||value.endsWith('>')?'xml-tag':'xml-attribute';
+        span.textContent=value;fragment.append(span);end=match.index+value.length;
+      }
+      fragment.append(document.createTextNode(visible.slice(end)+'\n'));
+    }
     $('source-highlight').replaceChildren(fragment);
-    syncEditorScroll();
   }
   function syncEditorScroll() {
+    highlightSource($('source').value);
     $('line-numbers').scrollTop=$('source').scrollTop;
-    $('source-highlight').style.transform=`translate(${- $('source').scrollLeft}px,${- $('source').scrollTop}px)`;
+    $('source-highlight').style.transform=`translate(${- $('source').scrollLeft}px,${highlightLineOffset-$('source').scrollTop}px)`;
     if(locatedSource) {
       const {firstLine,lastLine,lineHeight,padding}=locatedSource;
       Object.assign($('source-locate-highlight').style,{top:`${padding+firstLine*lineHeight-$('source').scrollTop}px`,height:`${(lastLine-firstLine+1)*lineHeight}px`});
@@ -1633,15 +1796,17 @@
   }
   function updateEditor() {
     const text=$('source').value;highlightSource(text);
-    const lineCount=text.split('\n').length;$('line-numbers').textContent=Array.from({length:lineCount},(_,i)=>i+1).join('\n');$('line-numbers').scrollTop=$('source').scrollTop;
-    const before=text.slice(0,$('source').selectionStart),line=before.split('\n').length,column=before.length-before.lastIndexOf('\n');$('cursor-position').textContent=`Ln ${line}, Col ${column}`;
+    const lineCount=editorLineStarts.length;$('line-numbers').textContent=Array.from({length:lineCount},(_,i)=>i+1).join('\n');$('line-numbers').scrollTop=$('source').scrollTop;
+    const offset=$('source').selectionStart,line=editorLineAt(offset)+1,column=offset-editorLineStarts[line-1]+1;$('cursor-position').textContent=`Ln ${line}, Col ${column}`;
     const source=state.context?.sourceFile,saved=text===source?.savedText,exported=text===source?.exportedText,applied=text===state.baseline;
     $('save-state').classList.toggle('dirty',!saved&&!exported&&!!text);$('save-state').removeAttribute('data-i18n');
     $('save-state').textContent=state.saving?t('saving'):!text?t('emptyFile'):exported?t('copyExported'):saved?(source.written?(applied?t('saved'):t('savedUnapplied')):t('applied')):applied?t('appliedUnsaved'):t('modified');
     $('filename').readOnly=!!source&&source.savedText!==null;
     $('reload').disabled=state.saving||!text.trim();$('save').disabled=state.saving||!text.trim();
     $('convert-model').disabled=conversionBusy||state.saving||!text.trim();
-    $('save').textContent=t(state.saving?'saving':state.context?.originalFormat?'exportWorkingCopy':'save');
+    $('save').textContent=t(state.saving?'saving':state.context?.originalFormat&&!state.context.nativeEditable?'exportWorkingCopy':'save');
+    syncEditorScroll();
+    $('source-format').textContent=(state.context?.nativeEditable&&state.context.originalFormat==='usd'?'USDA':'XML')+' · UTF-8';
     $('save').title=source&&source.savedText!==null&&!source.handle?`${t('chooseSource')}: ${source.name}`:'Ctrl + S';
   }
   $('source').oninput=()=>{cancelLinkNavigation();$('editor-error').hidden=true;updateEditor();};$('source').onscroll=syncEditorScroll;$('source').onkeyup=updateEditor;$('source').onclick=updateEditor;
@@ -1656,29 +1821,29 @@
       $('conversion-status').removeAttribute('data-i18n');$('conversion-status').textContent=t(label)+' · '+Math.round($('conversion-progress').value*100)+'%';
     };
     try {
-      const text=$('source').value;validate(text);
-      const report=await modelFormats.convert(text,state.context||{name:$('filename').value||'model.urdf',base:new URL('.',location.href).href},$('conversion-target').value,{signal:conversionController.signal,onProgress});
+      const working=await editorWorking($('source').value);
+      const report=await modelFormats.convert(working.text,working.context||{name:$('filename').value||'model.urdf',base:new URL('.',location.href).href},$('conversion-target').value,{signal:conversionController.signal,onProgress});
       const done=report?.targetFormat==='step'?'conversionStepDone':'conversionDone';
       $('conversion-status').textContent=t(done);$('conversion-status').setAttribute('data-i18n',done);
     }catch(error){$('conversion-status').removeAttribute('data-i18n');$('conversion-status').textContent=error.name==='AbortError'?t('conversionCancelled'):`${t('conversionFailed')}: ${error.message||String(error)}`;$('conversion-status').classList.toggle('error',error.name!=='AbortError');}
     finally{conversionBusy=false;conversionController=null;$('conversion-progress-row').hidden=true;updateEditor();}
   };
   $('cancel-conversion').onclick=()=>conversionController?.abort();
-  $('reload').onclick=async()=>{if(state.saving)return;try{await loadText($('source').value,state.context||{name:$('filename').value||'newfile.urdf',base:new URL('.',location.href).href},{replaceEditor:false});}catch(error){fail(error);}};
+  $('reload').onclick=async()=>{if(state.saving)return;const version=++state.version;try{const working=await editorWorking($('source').value);if(version!==state.version)return;await loadText(working.text,working.context||{name:$('filename').value||'newfile.urdf',base:new URL('.',location.href).href},{replaceEditor:false,replaceModel:true});}catch(error){fail(error);}};
   $('save').onclick=async()=>{
     const text=$('source').value;if(state.saving||!text.trim())return;
     const context=state.context,source=context?.sourceFile||{name:$('filename').value||'newfile.urdf',handle:null,savedText:null,written:false};
     state.saving=true;$('editor-error').hidden=true;updateEditor();
     try {
-      validate(text);
-      if(context?.originalFormat){
+      await editorWorking(text,context);
+      if(context?.originalFormat&&!context.nativeEditable){
         await modelFormats.convert(text,context,'urdf');source.exportedText=text;status(t('conversionDone'));return;
       }
-      let name=$('filename').value.trim().replace(/[\\/:*?"<>|]/g,'_')||'robot.urdf';if(!/\.(urdf|xml)$/i.test(name))name+='.urdf';
+      let name=$('filename').value.trim().replace(/[\\/:*?"<>|]/g,'_')||'robot.urdf';if(!/\.(urdf|xml|mjcf|usd|usda)$/i.test(name))name+='.urdf';
       await sourceFiles.save(source,text,name);
       if(context){context.sourceFile=source;context.name=source.name;}
       else state.context={name:source.name,sourceFile:source,base:new URL('.',location.href).href};
-      $('filename').value=source.name;status(`${t('saveHint')} · ${source.name}`);
+      $('filename').value=source.name;rememberModel();refreshModelManager();status(`${t('saveHint')} · ${source.name}`);
     }catch(error){
       if(error.name!=='AbortError'){$('editor-error').hidden=false;$('editor-error').textContent=error.message||String(error);status(`${t('saveFailed')} · ${error.message||error}`,'error');}
     }finally{state.saving=false;updateEditor();}
@@ -1807,11 +1972,11 @@
   });
   statics=createStaticsWorkbench({THREE,viewer,grid,refreshScene:()=>{queueLinkMeasurementUpdate();queueJointAngleUpdate();fitView();},getModel:()=>({xml:state.xml,version:state.version}),getLanguage:()=>lang,openRight:()=>setPanel('editor',true),refreshAxes:refreshJointAngleAxis,project:projectMeasurementPoint});
   $('help').onclick=()=>{$('help-dialog').showModal();$('help-content').scrollTop=0;};$('close-help').onclick=()=>$('help-dialog').close();
-  function translate(){document.documentElement.lang=lang==='zh'?'zh-CN':'en';$$('[data-i18n]').forEach(el=>el.textContent=t(el.dataset.i18n));$('language').textContent=lang==='zh'?'EN':'中文';$('joint-search').placeholder=lang==='zh'?'搜索关节…':'Search joints…';renderURDFHelp($('help-content'),lang);meshSimplifier.translate();updateEditor();filterJoints();refreshWorkspace();statics?.languageChanged();updateLinkMeasureUI();updateLinkMeasurement();if(surfaceSnap.pointer)renderSurfaceSnap();if(viewer.robot){$('model-meta').textContent=`${Object.keys(viewer.robot.links).length} ${t('linkTotal')} · ${Object.keys(viewer.robot.joints).length} ${t('jointTotal')}`;}}
+  function translate(){document.documentElement.lang=lang==='zh'?'zh-CN':'en';$$('[data-i18n]').forEach(el=>el.textContent=t(el.dataset.i18n));$('language').textContent=lang==='zh'?'EN':'中文';$('joint-search').placeholder=lang==='zh'?'搜索关节…':'Search joints…';renderURDFHelp($('help-content'),lang);meshSimplifier.translate();updateEditor();filterJoints();refreshWorkspace();refreshModelManager();statics?.languageChanged();updateLinkMeasureUI();updateLinkMeasurement();if(surfaceSnap.pointer)renderSurfaceSnap();if(viewer.robot){$('model-meta').textContent=`${Object.keys(viewer.robot.links).length} ${t('linkTotal')} · ${Object.keys(viewer.robot.joints).length} ${t('jointTotal')}`;}}
   $('language').onclick=()=>{lang=lang==='zh'?'en':'zh';translate();};
   $('theme').onclick=()=>{const light=document.body.classList.toggle('light');$('theme').textContent=light?'☀':'☾';document.querySelector('meta[name="theme-color"]').content=light?'#E8F0F8':'#2E6B8A';grid.material.color.set(light?0x2e6b8a:0x6ba3c8);grid.material.opacity=light?.26:.32;viewer.redraw();};
   translate();
   installModelPicking();
   // Small read-only debugging surface for local integration checks.
-  window.urdfWorkbench={get meshSimplifier(){return meshSimplifier.snapshot;},get viewer(){return viewer;},get display(){return {...state.display};},get hoveredLink(){return hoveredLink;},get selectedObject(){return state.selected;},get linkMeasurement(){return {enabled:linkMeasurement.enabled,links:linkMeasurement.links.map(link=>link.name),unit:linkMeasurement.unit,distance:linkMeasurement.distance,delta:linkMeasurement.delta?.toArray() || null};},get surfaceMeasurement(){return {anchors:surfaceMeasurement.anchors.map(a=>({link:a.link.name,kind:a.kind,fitted:a.fitted,local:a.local.toArray(),world:a.object.localToWorld(a.local.clone()).toArray()})),unit:surfaceMeasurement.unit,distance:surfaceMeasurement.distance,delta:surfaceMeasurement.delta?.toArray() || null};},get statics(){return statics.snapshot;},get loading(){return $('status').classList.contains('loading');}};
+  window.urdfWorkbench={get models(){return models.map(m=>({id:m.id,name:m.context.name,robot:m.robot,active:m===activeModel,visible:m.group.visible,offset:m.group.position.toArray()}));},get meshSimplifier(){return meshSimplifier.snapshot;},get viewer(){return viewer;},get display(){return {...state.display};},get hoveredLink(){return hoveredLink;},get selectedObject(){return state.selected;},get linkMeasurement(){return {enabled:linkMeasurement.enabled,links:linkMeasurement.links.map(link=>link.name),unit:linkMeasurement.unit,distance:linkMeasurement.distance,delta:linkMeasurement.delta?.toArray() || null};},get surfaceMeasurement(){return {anchors:surfaceMeasurement.anchors.map(a=>({link:a.link.name,kind:a.kind,fitted:a.fitted,local:a.local.toArray(),world:a.object.localToWorld(a.local.clone()).toArray()})),unit:surfaceMeasurement.unit,distance:surfaceMeasurement.distance,delta:surfaceMeasurement.delta?.toArray() || null};},get statics(){return statics.snapshot;},get loading(){return $('status').classList.contains('loading');}};
 })();

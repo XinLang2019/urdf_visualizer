@@ -2,7 +2,7 @@
 (() => {
   'use strict';
   const normalized=text=>text.replace(/\r\n?/g,'\n');
-  const types=[{description:'URDF / XML',accept:{'application/xml':['.urdf','.xml']}}];
+  const types=[{description:'URDF / MJCF / USDA',accept:{'application/octet-stream':['.urdf','.xml','.mjcf','.usd','.usda']}}];
   window.URDFSourceFiles=class {
     constructor(message) {this.message=message;this.local=new WeakMap();this.urls=new Map();}
     fromFile(file,handle=null) {

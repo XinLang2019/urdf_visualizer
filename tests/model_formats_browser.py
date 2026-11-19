@@ -112,7 +112,7 @@ def run(client,url,output):
         if BROWSER_FORMATS:verify_browser_package(package)
     for source,package in native.items():
         import_files(client,package,'format_fixture')
-        smoke.check(client,'document.getElementById("filename").value.endsWith(".viewer.urdf") && document.getElementById("save-state").textContent.includes("未保存")','native '+source.upper()+' exposes an explicit URDF working copy instead of overwriting the source')
+        smoke.check(client,'(new DOMParser().parseFromString(document.getElementById("source").value,"application/xml").documentElement.tagName==="mujoco" || document.getElementById("source").value.startsWith("#usda") || document.getElementById("filename").value.endsWith(".viewer.urdf"))','native '+source.upper()+' exposes editable source text, with a URDF fallback for binary USD')
         smoke.check(client,'Math.abs(urdfWorkbench.viewer.robot.joints.hinge.limit.lower+1)<1e-5 && Math.abs(urdfWorkbench.viewer.robot.joints.hinge.limit.upper-1.2)<1e-5','native '+source.upper()+' retains signed radian limits')
         client.js('(()=>{document.getElementById("tab-joints").click();const slider=document.querySelector("#joint-list li[data-name=hinge] input[type=range]");slider.value=.4;slider.dispatchEvent(new Event("input"));})()')
         smoke.check(client,'Math.abs(urdfWorkbench.viewer.robot.joints.hinge.angle-.4)<1e-7','native '+source.upper()+' supports existing joint controls')
@@ -127,17 +127,18 @@ def run(client,url,output):
                 doc=ET.fromstring(converted['model.urdf'])
                 for mesh in doc.findall('.//mesh'):assert mesh.get('filename') in converted
         client.screenshot(str(output/('formats-'+source+'.png')))
-    # Reimport an exported binary USD package and save a working copy to a new file.
-    import_files(client,native['usd'],'format_fixture')
-    count=client.js('formatDownloads.length')
-    client.js("window.beforeCopySource=document.getElementById('source').value;document.getElementById('save').click()")
-    client.until('formatDownloads.length>'+str(count)+' && document.getElementById("save-state").textContent==="副本已导出"',90)
-    item=client.js('formatDownloads['+str(count)+']')
-    with zipfile.ZipFile(io.BytesIO(base64.b64decode(item['data']))) as archive:
-        assert archive.read('model.urdf').decode().startswith('<?xml')
-        import xml.etree.ElementTree as ET
-        for mesh in ET.fromstring(archive.read('model.urdf')).findall('.//mesh'):assert mesh.get('filename') in archive.namelist()
-    smoke.check(client,'document.getElementById("source").value===beforeCopySource && document.getElementById("save").textContent==="导出 URDF 包"','saving a USD working copy exports XML with all mesh resources and leaves the native source untouched')
+    if not BROWSER_FORMATS:
+        # Reimport an exported binary USD package and save a working copy to a new file.
+        import_files(client,native['usd'],'format_fixture')
+        count=client.js('formatDownloads.length')
+        client.js("window.beforeCopySource=document.getElementById('source').value;document.getElementById('save').click()")
+        client.until('formatDownloads.length>'+str(count)+' && document.getElementById("save-state").textContent==="副本已导出"',90)
+        item=client.js('formatDownloads['+str(count)+']')
+        with zipfile.ZipFile(io.BytesIO(base64.b64decode(item['data']))) as archive:
+            assert archive.read('model.urdf').decode().startswith('<?xml')
+            import xml.etree.ElementTree as ET
+            for mesh in ET.fromstring(archive.read('model.urdf')).findall('.//mesh'):assert mesh.get('filename') in archive.namelist()
+        smoke.check(client,'document.getElementById("source").value===beforeCopySource && document.getElementById("save").textContent==="导出 URDF 包"','saving a USD working copy exports XML with all mesh resources and leaves the native source untouched')
     # Missing / unsupported native resources retain the currently loaded model.
     bad='<mujoco><asset><mesh name="missing" file="missing.stl"/></asset><worldbody><body><geom type="mesh" mesh="missing"/></body></worldbody></mujoco>'
     client.js('''(()=>{window.retainedFormatRobot=urdfWorkbench.viewer.robot;const d=new DataTransfer();d.items.add(new File([BAD],'broken.xml'));const i=document.getElementById('file-input');i.files=d.files;i.dispatchEvent(new Event('change'))})()'''.replace('BAD',json.dumps(bad)))
@@ -152,7 +153,7 @@ def run(client,url,output):
         from browser_format_cases import check_browser_cases
         check_browser_cases(client)
     # Real bundled Go2: DAE coordinates, native centering and USD geometry.
-    client.js("""window.formatBounds=()=>{const T=parcelRequire('../node_modules/three/build/three.module.js'),out={};urdfWorkbench.viewer.world.updateWorldMatrix(true,true);for(const [name,link]of Object.entries(urdfWorkbench.viewer.robot.links)){const box=new T.Box3();for(const child of link.children)if(child.isURDFVisual)box.expandByObject(child,true);if(!box.isEmpty())out[name]=[...box.min.toArray(),...box.max.toArray()];}return out}""")
+    client.js("""window.formatBounds=()=>{const T=parcelRequire('../node_modules/three/build/three.module.js'),out={};urdfWorkbench.viewer.world.updateWorldMatrix(true,true);for(const [name,link]of Object.entries(urdfWorkbench.viewer.robot.links)){const box=new T.Box3();for(const child of link.children)if(child.isURDFVisual)box.expandByObject(child,true);if(!box.isEmpty())out[name]=[...box.min.sub(urdfWorkbench.viewer.robot.parent.getWorldPosition(new T.Vector3())).toArray(),...box.max.sub(urdfWorkbench.viewer.robot.parent.getWorldPosition(new T.Vector3())).toArray()];}return out}""")
     for target in ['mjcf','usd']:
         client.js('document.getElementById("example-select").value="urdf/go2/urdf/go2.urdf";document.getElementById("load-example").click()')
         client.until('urdfWorkbench.viewer.robot?.robotName==="go2_description" && !urdfWorkbench.loading',60)
@@ -173,7 +174,7 @@ def run(client,url,output):
     client.js('HTMLAnchorElement.prototype.click=formatClick')
     exceptions=[e for e in client.events if e.get('method')=='Runtime.exceptionThrown']
     assert not exceptions,exceptions
-    print('PASS '+('static browser import, all six conversions, text USDA' if BROWSER_FORMATS else 'native multipart import, all six conversions, binary USD')+', packaged meshes, joint controls, safe working-copy saves and errors',flush=True)
+    print('PASS '+('static browser import, all six conversions, text USDA' if BROWSER_FORMATS else 'native multipart import, all six conversions, binary USD')+', packaged meshes, joint controls, native source display and safe save behavior',flush=True)
 
 if __name__=='__main__':
     os.environ['URDF_TEST_FORMATS']='0' if BROWSER_FORMATS else '1';smoke.run=run;smoke.main()
