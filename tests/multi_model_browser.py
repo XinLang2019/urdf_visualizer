@@ -18,7 +18,7 @@ def upload(client,files,choose=None):
 
 
 def switch(client,index):
-    client.js(f'''(()=>{{const s=document.getElementById('model-select');s.value=urdfWorkbench.models[{index}].id;s.dispatchEvent(new Event('change'));}})()''')
+    client.js(f'''(()=>{{document.querySelector('#model-tabs button[data-model-id="'+urdfWorkbench.models[{index}].id+'"]').click();}})()''')
     rendered_frame(client)
 
 
@@ -60,7 +60,7 @@ def run(client,url,output):
     client.js('window.goodUsd=document.getElementById("source").value;window.goodRobot=urdfWorkbench.viewer.robot;document.getElementById("source").value="#usda 1.0\\ndef Xform";document.getElementById("reload").click()')
     client.until('!document.getElementById("editor-error").hidden')
     check('urdfWorkbench.viewer.robot===goodRobot&&urdfWorkbench.models.length===3','invalid native code preserves the current and other models')
-    client.js('document.getElementById("source").value=goodUsd;document.getElementById("source").dispatchEvent(new Event("input"));document.getElementById("models-show-all").click()')
+    client.js('document.getElementById("source").value=goodUsd;document.getElementById("source").dispatchEvent(new Event("input"));if(!document.getElementById("models-show-all").checked)document.getElementById("models-show-all").click()')
     check('urdfWorkbench.models.every(m=>m.visible)&&urdfWorkbench.models[2].offset[0]>urdfWorkbench.models[1].offset[0]','show-all renders every model with automatic non-overlapping offsets')
     client.js('document.getElementById("model-spacing-toggle").click();document.getElementById("model-reference").value=urdfWorkbench.models[0].id;document.getElementById("model-reference").dispatchEvent(new Event("change"));for(const [a,n]of [["x",2],["y",.6],["z",.4]]){const i=document.getElementById("model-offset-"+a);i.value=n;i.dispatchEvent(new Event("change"));}document.getElementById("fit-view").click()')
     check('JSON.stringify(urdfWorkbench.models[2].offset)===JSON.stringify([2,.6,.4])&&document.getElementById("model-distance").textContent.includes("2.126")','relative XYZ placement and measured origin distance use metres')
@@ -81,10 +81,10 @@ def run(client,url,output):
     check('document.body.scrollWidth===innerWidth&&document.getElementById("model-manager").getBoundingClientRect().right<=innerWidth','model manager fits mobile layout')
     client.screenshot(str(output/'multi-model-mobile.png'))
     client.call('Emulation.setDeviceMetricsOverride',{'width':1897,'height':942,'deviceScaleFactor':1,'mobile':False});rendered_frame(client)
-    switch(client,2);client.js('document.getElementById("model-remove").click()')
+    switch(client,2);client.js('document.querySelector(".model-tab.is-active .model-tab-close").click()')
     check('urdfWorkbench.models.length===2&&urdfWorkbench.models.filter(m=>m.active).length===1','removing a model keeps another model active')
     switch(client,1);client.js('document.getElementById("save").click()');client.until('!document.getElementById("save").disabled')
-    client.js('document.getElementById("model-remove").click();document.getElementById("model-remove").click()')
+    client.js('document.querySelector(".model-tab.is-active .model-tab-close").click();document.querySelector(".model-tab.is-active .model-tab-close").click()')
     check('urdfWorkbench.models.length===0&&!urdfWorkbench.viewer.robot&&document.getElementById("source").value===""','removing the last model clears editor and model-specific tools')
     upload(client,{'all/one.urdf':URDF,'all/two.urdf':URDF.replace('first','second')},'加载全部模型')
     check('urdfWorkbench.models.length===2&&urdfWorkbench.models.every(m=>m.visible)','Load all imports multiple model descriptions and displays them together')

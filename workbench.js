@@ -158,15 +158,15 @@
     newModel:['模型','Model']
   };
   Object.assign(strings,{
-    showAllModels:['同时显示','Show all'],arrangeModels:['自动排列','Arrange'],modelPosition:['位置','Position'],
+    showAllModels:['同时显示','Show all'],arrangeModels:['恢复并排','Reset side by side'],modelPosition:['位置','Position'],
     modelPositionHint:['相对参考模型原点的 XYZ 偏移（m）','XYZ offset from the reference model origin (m)'],modelGap:['排列间隙','Gap'],
-    modelOriginDistance:['原点距离','Origin distance']
+    modelOriginDistance:['原点距离','Origin distance'],modelLoadOptions:['加载选项','Load options']
   });
   const nativeFormats=new URLSearchParams(location.search).get('formats')==='native';
   let lang = 'zh';
   const t = key => strings[key]?.[lang === 'zh' ? 0 : 1] || key;
   const state = { display:{visual:true,collision:false,inertia:false,com:false,axes:false,jointAxes:false,shadow:true,lighting:true,grid:true}, radians:true, limits:true, source:'', baseline:'', saving:false, context:null, version:0, selected:null, rows:new Map(), helpers:[], mobile:'files', activeTab:'files', sidebarCollapsed:false, editorOpen:innerWidth>1000 };
-  const models=[];let activeModel=null,modelSerial=0;
+  const models=[],linkModels=new WeakMap();let activeModel=null,modelSerial=0;
   const sourceFiles=new URDFSourceFiles(t);
   const modelFormats=new URDFModelFormats(t);
   if(nativeFormats)$('conversion-target').querySelector('[value="usd"]').textContent='USD (.usd)';
@@ -319,14 +319,31 @@
   function rememberModel() {
     if(!activeModel)return;
     Object.assign(activeModel,{context:state.context,source:state.source,xml:state.xml,baseline:state.baseline,helpers:state.helpers,
-      draft:$('source').value,filename:$('filename').value,scrollTop:$('source').scrollTop,scrollLeft:$('source').scrollLeft});
+      draft:$('source').value,filename:$('filename').value,scrollTop:$('source').scrollTop,scrollLeft:$('source').scrollLeft,
+      view:{context:state.context,hierarchy:state.hierarchy,orderedJoints:state.orderedJoints,rows:state.rows,graph:structureGraph,fixed:showFixedNodes,lang,
+        files:[...$('file-tree').childNodes],joints:[...$('joint-list').childNodes],tree:[...$('tree').childNodes],jointScroll:$('joints-panel').querySelector('.panel-body').scrollTop}});
   }
   function sceneModelBounds(){const box=new THREE.Box3();for(const model of models)if(model.group.visible)box.union(objectBounds(model.robot));return box;}
-  function modelForLink(link){if(!link)return null;return models.find(model=>model.robot===link||Object.values(model.robot.links).includes(link));}
+  function modelForLink(link){return link?linkModels.get(link):null;}
   function refreshModelManager(){
     $('model-manager').hidden=!models.length;
-    $('model-select').replaceChildren(...models.map((model,i)=>{const option=document.createElement('option');option.value=model.id;option.textContent=`${i+1} · ${model.context.name}`;return option;}));
-    $('model-select').value=activeModel?.id||'';
+    const focused=document.activeElement?.dataset.modelId,tabList=$('model-tabs'),ids=new Set(models.map(m=>m.id));
+    for(const node of [...tabList.children])if(!ids.has(node.dataset.modelId))node.remove();
+    for(const [index,model]of models.entries()){
+      let tab=tabList.querySelector(`.model-tab[data-model-id="${model.id}"]`);
+      if(!tab){
+        tab=document.createElement('div');tab.className='model-tab';tab.dataset.modelId=model.id;
+        const select=document.createElement('button');select.type='button';select.className='model-tab-select';select.id='model-tab-'+model.id;select.dataset.modelId=model.id;select.setAttribute('role','tab');select.setAttribute('aria-controls','workspace-content code-workspace');
+        select.onclick=()=>activateModel(model);
+        const close=document.createElement('button');close.type='button';close.className='model-tab-close';close.textContent='×';close.onclick=()=>removeModel(model);
+        tab.append(select,close);tabList.append(tab);
+      }
+      const selected=model===activeModel,select=tab.firstElementChild,close=tab.lastElementChild;
+      select.textContent=model.context.name;select.title=`${index+1} · ${model.context.path||model.context.name}`;select.setAttribute('aria-label',select.title);
+      select.setAttribute('aria-selected',String(selected));select.tabIndex=selected?0:-1;select.disabled=state.saving;
+      tab.classList.toggle('is-active',selected);close.title=(lang==='zh'?'关闭 ':'Close ')+model.context.name;close.setAttribute('aria-label',close.title);close.disabled=state.saving;
+    }
+    if(focused&&!document.activeElement?.dataset.modelId)tabList.querySelector(`button[data-model-id="${focused}"]`)?.focus({preventScroll:true});
     $('models-show-all').disabled=models.length<2;$('models-arrange').disabled=models.length<2;
     const previous=$('model-reference').value,references=models.filter(m=>m!==activeModel);
     $('model-reference').replaceChildren(...references.map(m=>{const option=document.createElement('option');option.value=m.id;option.textContent=m.context.name;return option;}));
@@ -337,9 +354,9 @@
     const distance=activeModel?activeModel.group.position.distanceTo(origin):0;
     $('model-distance').textContent=`${t('modelOriginDistance')}: ${distance.toFixed(3)} m`;
   }
-  function refreshModelVisibility(){
+  function refreshModelVisibility({display=true,environment=true}={}){
     for(const model of models)model.group.visible=$('models-show-all').checked||model===activeModel;
-    refreshModelManager();applyDisplay();viewer._updateEnvironment();viewer.redraw();
+    refreshModelManager();if(display)applyDisplay();else updateHelperVisibility();if(environment)viewer._updateEnvironment();viewer.redraw();
   }
   function arrangeModels(){
     let edge=null;const gap=Number($('model-gap').value);
@@ -359,15 +376,31 @@
     conversionController?.abort();rememberModel();clearActiveTools();++state.version;
     activeModel=model;viewer.robot=model.robot;state.context=model.context;state.source=model.source;state.xml=model.xml;state.baseline=model.baseline;state.helpers=model.helpers;
     $('source').value=model.draft;$('filename').value=model.filename;$('editor-error').hidden=true;
-    viewer._setIgnoreLimits(!state.limits);meshSimplifier.setContext(state.context);
-    buildHierarchy();buildFileTree();buildJoints();buildTree();refreshModelVisibility();updateEditor();statics?.modelChanged();
+    if(Object.values(model.robot.joints).some(j=>j.ignoreLimits!==!state.limits))viewer._setIgnoreLimits(!state.limits);
+    const view=model.view;
+    if(view?.context===state.context){
+      state.hierarchy=view.hierarchy;state.orderedJoints=view.orderedJoints;state.rows=view.rows;structureGraph=view.graph;
+      $('file-tree').replaceChildren(...view.files);$('joint-list').replaceChildren(...view.joints);$('tree').replaceChildren(...view.tree);
+      if(view.lang!==lang)buildJoints();else{for(const row of state.rows.values())row.update();filterJoints();}
+      if(view.lang!==lang||view.fixed!==showFixedNodes)buildTree();else refreshGraphVisibility();
+      $('joints-panel').querySelector('.panel-body').scrollTop=view.jointScroll;
+    }else{buildHierarchy();buildFileTree();buildJoints();buildTree();}
+    refreshModelVisibility({display:false,environment:!$('models-show-all').checked});updateEditor();statics?.modelChanged();
+    if(state.activeTab==='files')meshSimplifier.setContext(state.context);
     $('source').scrollTop=model.scrollTop||0;$('source').scrollLeft=model.scrollLeft||0;syncEditorScroll();
     const linkCount=Object.keys(model.robot.links).length,jointCount=Object.keys(model.robot.joints).length;
     $('model-name').textContent=model.robot.robotName||model.context.name;$('model-name').title=model.context.name;
     $('model-meta').textContent=`${linkCount} ${t('linkTotal')} · ${jointCount} ${t('jointTotal')}`;$('structure-count').textContent=`${linkCount} / ${jointCount}`;
     status(`${t('modelLoaded')} · ${model.context.name}`);if(fit)fitView();
+    requestAnimationFrame(()=>{if(activeModel===model)$('model-tab-'+model.id)?.parentElement.scrollIntoView({block:'nearest',inline:'nearest'});});
   }
-  $('model-select').onchange=()=>activateModel(models.find(m=>m.id===$('model-select').value),{fit:!$('models-show-all').checked});
+  $('model-tabs').onkeydown=event=>{
+    if(!['ArrowLeft','ArrowRight','Home','End','Delete'].includes(event.key))return;
+    event.preventDefault();const index=models.indexOf(activeModel);
+    if(event.key==='Delete'){removeModel(activeModel);return;}
+    const next=event.key==='Home'?0:event.key==='End'?models.length-1:(index+(event.key==='ArrowLeft'?models.length-1:1))%models.length;
+    activateModel(models[next]);$('model-tab-'+models[next].id)?.focus({preventScroll:true});
+  };
   $('models-show-all').onchange=()=>{refreshModelVisibility();fitView();};
   $('models-arrange').onclick=arrangeModels;
   $('model-reference').onchange=refreshModelManager;
@@ -377,13 +410,13 @@
     const input=$('model-offset-'+axis),value=Number(input.value);if(!activeModel||input.value===''||!Number.isFinite(value)){refreshModelManager();return;}
     clearMeasurement();clearJointAngleUI();const reference=models.find(m=>m.id===$('model-reference').value);activeModel.group.position[axis]=value+(reference?.group.position[axis]||0);refreshModelManager();viewer._updateEnvironment();viewer.redraw();statics?.modelChanged();
   };
-  $('model-remove').onclick=()=>{
-    if(!activeModel||state.saving)return;
+  function removeModel(model=activeModel){
+    if(!model||state.saving)return;
     rememberModel();
-    if(edited(activeModel.draft,activeModel.baseline,activeModel.context.sourceFile)){status(t('unsaved'),'error');return;}
-    const removed=activeModel,index=models.indexOf(removed);
+    if(edited(model.draft,model.baseline,model.context.sourceFile)){status(t('unsaved'),'error');return;}
+    const removed=model,index=models.indexOf(removed);
     // Switch before releasing objects so selection, dragging and overlays finish cleanly.
-    if(models.length>1){activateModel(models[index===0?1:index-1]);models.splice(index,1);dispose(removed.group);if(!models.some(m=>m.context.assets===removed.context.assets))releaseContext(removed.context);refreshModelVisibility();fitView();}
+    if(models.length>1){if(model===activeModel)activateModel(models[index===0?1:index-1]);models.splice(index,1);dispose(removed.group);if(!models.some(m=>m.context.assets===removed.context.assets))releaseContext(removed.context);refreshModelVisibility();fitView();}
     else{
       clearActiveTools();models.splice(index,1);activeModel=null;dispose(removed.group);releaseContext(removed.context);
       viewer.robot=null;state.context=null;state.source='';state.xml=null;state.helpers=[];state.rows.clear();state.baseline='';++state.version;
@@ -393,7 +426,7 @@
       $('file-tree').replaceChildren();$('joint-list').replaceChildren();$('tree').replaceChildren();$('graph-measure').disabled=true;
       meshSimplifier.setContext(null);refreshModelManager();updateEditor();statics?.modelChanged();viewer.redraw();status(t('ready'));
     }
-  };
+  }
   async function editorWorking(text,context=state.context){
     if(!context?.nativeEditable){validate(text);return {text,context};}
     const assets=new Map(context.assets),file=new File([text],context.originalName,{type:'text/plain'});
@@ -430,7 +463,7 @@
       const group=new THREE.Group();viewer.world.add(group);
       activeModel={id:String(++modelSerial),group};models.push(activeModel);
     }
-    state.helpers=[];activeModel.robot=robot;
+    state.helpers=[];activeModel.robot=robot;for(const link of Object.values(robot.links))linkModels.set(link,activeModel);
     viewer.robot=robot;viewer.world.visible=true;activeModel.group.add(robot);
     robot.traverse(child=>{if(child.isMesh){child.castShadow=true;child.receiveShadow=true;const mats=Array.isArray(child.material)?child.material:[child.material];mats.forEach(mat=>{if(mat?.map)mat.map.colorSpace=THREE.SRGBColorSpace;});}});
     viewer._setIgnoreLimits(!state.limits);
@@ -684,7 +717,7 @@
   }
   const compactNumber=value=>Number.isFinite(value)?String(Number(value.toFixed(3))):'—';
   function buildJoints() {
-    state.rows.clear();$('joint-list').replaceChildren();
+    state.rows=new Map();$('joint-list').replaceChildren();
     for(const node of state.orderedJoints) {
       const joint=node.object;
       const row=document.createElement('li');row.dataset.name=joint.name;row.dataset.type=joint.jointType;
@@ -1370,14 +1403,18 @@
       const group=new THREE.Group();group.userData.markerKind='inertia';applyOrigin(group,origin);group.add(box);helper(group,'inertia',link);
     }
   }
+  function updateHelperVisibility(){
+    const d=state.display;
+    for(const model of models)model.helpers?.forEach(({object,kind})=>object.visible=d[kind] || (kind==='jointAxes' && model===activeModel && (object.parent===activeDragJoint || (statics?.enabled && !object.userData.staticsInspectionHidden))));
+  }
   function applyDisplay(){
     setHoveredLink(null);clearSurfaceSnap();const d=state.display;
     viewer.showCollision=d.collision;viewer.displayShadow=d.shadow;viewer.directionalLight.castShadow=d.shadow;viewer.plane.visible=d.shadow;grid.visible=d.grid;
     viewer.ambientLight.intensity=d.lighting?.65:1.8;viewer.directionalLight.intensity=d.lighting?Math.PI:0;
     for(const model of models){
       model.robot.traverse(child=>{if(child.isURDFVisual)child.visible=d.visual;if(child.isURDFCollider){child.visible=d.collision;child.traverse(mesh=>{if(mesh.isMesh){mesh.material=viewer._collisionMaterial;mesh.castShadow=false;}});}});
-      model.helpers?.forEach(({object,kind})=>object.visible=d[kind] || (kind==='jointAxes' && model===activeModel && (object.parent===activeDragJoint || (statics?.enabled && !object.userData.staticsInspectionHidden))));
     }
+    updateHelperVisibility();
     updateInspectionAppearance();refreshModelHover();viewer.redraw();statics?.requestProjection();
   }
   $$('[data-display]').forEach(button=>button.onclick=()=>{const key=button.dataset.display;state.display[key]=!state.display[key];button.classList.toggle('active',state.display[key]);button.setAttribute('aria-pressed',String(state.display[key]));applyDisplay();});
@@ -1755,7 +1792,7 @@
     else {clearSurfaceSnap();refreshModelHover();}
   });
 
-  let highlightedSource=null,editorLineStarts=[0],highlightSliceKey='',highlightLineOffset=0;
+  let highlightedSource=null,editorLineStarts=[0],highlightSliceKey='',highlightLineOffset=0,numberedLineCount=0;
   function editorLineAt(offset){
     let lo=0,hi=editorLineStarts.length;while(lo+1<hi){const mid=(lo+hi)>>1;if(editorLineStarts[mid]<=offset)lo=mid;else hi=mid;}return lo;
   }
@@ -1796,13 +1833,15 @@
   }
   function updateEditor() {
     const text=$('source').value;highlightSource(text);
-    const lineCount=editorLineStarts.length;$('line-numbers').textContent=Array.from({length:lineCount},(_,i)=>i+1).join('\n');$('line-numbers').scrollTop=$('source').scrollTop;
+    const lineCount=editorLineStarts.length;if(numberedLineCount!==lineCount){$('line-numbers').textContent=Array.from({length:lineCount},(_,i)=>i+1).join('\n');numberedLineCount=lineCount;}$('line-numbers').scrollTop=$('source').scrollTop;
     const offset=$('source').selectionStart,line=editorLineAt(offset)+1,column=offset-editorLineStarts[line-1]+1;$('cursor-position').textContent=`Ln ${line}, Col ${column}`;
     const source=state.context?.sourceFile,saved=text===source?.savedText,exported=text===source?.exportedText,applied=text===state.baseline;
     $('save-state').classList.toggle('dirty',!saved&&!exported&&!!text);$('save-state').removeAttribute('data-i18n');
     $('save-state').textContent=state.saving?t('saving'):!text?t('emptyFile'):exported?t('copyExported'):saved?(source.written?(applied?t('saved'):t('savedUnapplied')):t('applied')):applied?t('appliedUnsaved'):t('modified');
     $('filename').readOnly=!!source&&source.savedText!==null;
     $('reload').disabled=state.saving||!text.trim();$('save').disabled=state.saving||!text.trim();
+    for(const button of $$('#model-tabs button'))button.disabled=state.saving;
+    $('model-add').disabled=state.saving;
     $('convert-model').disabled=conversionBusy||state.saving||!text.trim();
     $('save').textContent=t(state.saving?'saving':state.context?.originalFormat&&!state.context.nativeEditable?'exportWorkingCopy':'save');
     syncEditorScroll();
@@ -1890,6 +1929,7 @@
   }
   function setPanel(name,visible) {
     if(leftPanels.includes(name)) {
+      if(name==='files'&&visible)meshSimplifier.setContext(state.context);
       if(visible){state.activeTab=name;state.sidebarCollapsed=false;if(innerWidth<=600)state.mobile=name;}
       else if(state.activeTab===name)state.sidebarCollapsed=true;
     }else if(name==='editor') {

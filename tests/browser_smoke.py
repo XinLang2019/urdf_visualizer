@@ -52,6 +52,8 @@ def run(client, url, output):
     client.call('Page.navigate', {'url': url})
     client.until('!!window.urdfWorkbench')
     check(client, '!document.querySelector("#status.error")', 'WebGL initializes without external dependencies')
+    check(client, 'document.getElementById("models-show-all").checked', 'multiple models default to side-by-side display')
+    client.js('document.getElementById("models-show-all").checked=false;document.getElementById("models-show-all").dispatchEvent(new Event("change"))')  # isolate absolute-coordinate interaction fixtures
     check(client, 'JSON.stringify([...document.querySelectorAll(".workspace-tabs [role=tab]")].map(tab=>tab.dataset.panel))===JSON.stringify(["files","joints","structure"])', 'workspace contains only files, joints and structure')
     check(client, 'document.getElementById("graph-measure").disabled', 'link measurement is disabled until a model is loaded')
     client.screenshot(str(output / 'empty.png'))

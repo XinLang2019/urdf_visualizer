@@ -9,6 +9,7 @@ window.createStaticsWorkbench=function({THREE,viewer,grid,refreshScene,getModel,
   const annotations=new URDFStaticsAnnotations({THREE,viewer,project,svg});
   const engine=window.URDFStatics,svgNS='http://www.w3.org/2000/svg';
   let enabled=false,model=null,result=null,frame=0,projectionFrame=0,rightView='code',selected=null,ground=null,manual=new Set();
+  const modelCache=new WeakMap();
   const labels=new Map(),rows=new Map(),axisOpacity=new WeakMap();
   let hovered=null,pinned=null,lastEmphasis;
   const labelNotice=el('div','','statics-inspection-note');
@@ -43,31 +44,36 @@ window.createStaticsWorkbench=function({THREE,viewer,grid,refreshScene,getModel,
   function buildModel() {
     const {xml,version}=getModel(),robot=viewer.robot;
     if(!robot||!xml){model=null;return;}
-    viewer.world.updateWorldMatrix(true,true);
-    const masses=[],shapes=[],missing=[],invalid=[],joints=[];
-    for(const node of [...xml.documentElement.children].filter(e=>e.tagName==='link')) {
-      const name=node.getAttribute('name'),link=robot.links[name],inertial=direct(node,'inertial'),massTag=inertial&&direct(inertial,'mass');
-      const mass=massTag?(massTag.hasAttribute('value')?Number(massTag.getAttribute('value')):NaN):null;
-      if(mass===null)missing.push(name);else if(!Number.isFinite(mass)||mass<0)invalid.push(name);
-      else if(mass>0)masses.push({link:name,object:link,mass,local:V(vec(direct(inertial,'origin')?.getAttribute('xyz')))});
-      const collisions=link.children.filter(c=>c.isURDFCollider),visuals=link.children.filter(c=>c.isURDFVisual);
-      const meshes=[];
-      for(const group of collisions.length?collisions:visuals)group.traverse(mesh=>{if(mesh.isMesh&&mesh.geometry?.attributes.position){if(!mesh.geometry.boundingBox)mesh.geometry.computeBoundingBox();meshes.push(mesh);}});
-      if(meshes.length){const shape={link:name,object:link,meshes,fallback:!collisions.length};contactGeometry.prepare(shape);shapes.push(shape);}
+    const cached=modelCache.get(robot);
+    if(cached?.xml===xml){model=cached;model.version=version;}
+    else{
+      viewer.world.updateWorldMatrix(true,true);
+      const masses=[],shapes=[],missing=[],invalid=[],joints=[];
+      for(const node of [...xml.documentElement.children].filter(e=>e.tagName==='link')) {
+        const name=node.getAttribute('name'),link=robot.links[name],inertial=direct(node,'inertial'),massTag=inertial&&direct(inertial,'mass');
+        const mass=massTag?(massTag.hasAttribute('value')?Number(massTag.getAttribute('value')):NaN):null;
+        if(mass===null)missing.push(name);else if(!Number.isFinite(mass)||mass<0)invalid.push(name);
+        else if(mass>0)masses.push({link:name,object:link,mass,local:V(vec(direct(inertial,'origin')?.getAttribute('xyz')))});
+        const collisions=link.children.filter(c=>c.isURDFCollider),visuals=link.children.filter(c=>c.isURDFVisual);
+        const meshes=[];
+        for(const group of collisions.length?collisions:visuals)group.traverse(mesh=>{if(mesh.isMesh&&mesh.geometry?.attributes.position){if(!mesh.geometry.boundingBox)mesh.geometry.computeBoundingBox();meshes.push(mesh);}});
+        if(meshes.length){const shape={link:name,object:link,meshes,fallback:!collisions.length};contactGeometry.prepare(shape);shapes.push(shape);}
+      }
+      for(const node of [...xml.documentElement.children].filter(e=>e.tagName==='joint')) {
+        const object=robot.joints[node.getAttribute('name')],type=node.getAttribute('type');
+        if(!['revolute','continuous','prismatic'].includes(type))continue;
+        const descendants=[];object.traverse(o=>{if(o.isURDFLink)descendants.push(o.name);});
+        const limit=direct(node,'limit'),mimic=direct(node,'mimic');
+        joints.push({name:object.name,object,type,descendants,limit:limit?.hasAttribute('effort')?Math.abs(Number(limit.getAttribute('effort'))):null,mimic:mimic?{joint:mimic.getAttribute('joint'),multiplier:Number(mimic.getAttribute('multiplier')??1)}:null});
+      }
+      model={xml,version,masses,shapes,missing,invalid,joints,unsupported:[...xml.documentElement.children].filter(e=>e.tagName==='joint'&&['floating','planar'].includes(e.getAttribute('type'))).map(e=>e.getAttribute('name'))};
+      modelCache.set(robot,model);
     }
-    for(const node of [...xml.documentElement.children].filter(e=>e.tagName==='joint')) {
-      const object=robot.joints[node.getAttribute('name')],type=node.getAttribute('type');
-      if(!['revolute','continuous','prismatic'].includes(type))continue;
-      const descendants=[];object.traverse(o=>{if(o.isURDFLink)descendants.push(o.name);});
-      const limit=direct(node,'limit'),mimic=direct(node,'mimic');
-      joints.push({name:object.name,object,type,descendants,limit:limit?.hasAttribute('effort')?Math.abs(Number(limit.getAttribute('effort'))):null,mimic:mimic?{joint:mimic.getAttribute('joint'),multiplier:Number(mimic.getAttribute('multiplier')??1)}:null});
-    }
-    model={version,masses,shapes,missing,invalid,joints,unsupported:[...xml.documentElement.children].filter(e=>e.tagName==='joint'&&['floating','planar'].includes(e.getAttribute('type'))).map(e=>e.getAttribute('name'))};
-    lastEmphasis=undefined;ground=null;manual.clear();hovered=null;pinned=null;selected=joints[0]?.name||null;
+    lastEmphasis=undefined;ground=null;manual.clear();hovered=null;pinned=null;selected=model.joints[0]?.name||null;
     $('statics-contact-mode').value='auto';$('statics-contact-add').replaceChildren();
-    for(const shape of shapes){const option=el('option',shape.link);option.value=shape.link;$('statics-contact-add').append(option);}
+    for(const shape of model.shapes){const option=el('option',shape.link);option.value=shape.link;$('statics-contact-add').append(option);}
     labels.clear();rows.clear();$('statics-labels').replaceChildren(labelNotice);$('statics-joints').replaceChildren();
-    for(const [index,joint]of joints.entries()) {
+    for(const [index,joint]of model.joints.entries()) {
       const id=String(index+1).padStart(2,'0');joint.index=index;joint.labelId=id;
       const label=el('button',undefined,'statics-axis-label');label.type='button';label.dataset.joint=joint.name;
       label.append(el('span',joint.name,'statics-label-name'),el('strong','—','statics-label-value'));
@@ -117,12 +123,13 @@ window.createStaticsWorkbench=function({THREE,viewer,grid,refreshScene,getModel,
     enabled=value;if(!enabled){pinned=null;hovered=null;}document.body.classList.toggle('statics-enabled',enabled);
     $('statics-toggle').classList.toggle('active',enabled);$('statics-toggle').setAttribute('aria-pressed',String(enabled));
     $('statics-labels').hidden=!enabled;$('statics-overlay').toggleAttribute('hidden',!enabled);
+    if(enabled&&(!model||model.version!==getModel().version))buildModel();
     updateEmphasis();refreshAxes();if(enabled){setRightView('statics');requestSolve();}else{for(const label of labels.values())label.hidden=true;render();}
   }
   const reasons={invalidSettings:['请输入有效的重力、地面、坡度、摩擦与容差参数','Enter valid gravity, ground, slope, friction and tolerance settings'],invalidTerrain:['斜坡或摩擦参数无效','Invalid slope or friction parameters'],sliding:['无法静态站稳 · 静摩擦不足，会沿坡滑动','No static equilibrium · insufficient static friction'],balanced:['可静态平衡','Static equilibrium'],marginal:['临界支撑 · 稳定裕量为零','Marginal support · zero stability margin'],placementMismatch:['无法同时贴合全部支撑端 · 请调整关节姿态后再次贴合','Cannot fit every support · adjust the stance and fit again'],outsideSupport:['无法静态平衡 · 重心超出支撑范围','No static equilibrium · CoM outside support'],noContacts:['无有效地面接触','No valid ground contacts'],noMass:['缺少有效质量数据','No valid mass data'],noModel:['请先加载模型','Load a model first'],solverFailed:['接触力求解未收敛','Contact solver did not converge'],invalidMass:['质量数据无效','Invalid mass data'],unsupported:['暂不支持浮动 / 平面关节内部载荷','Internal floating / planar joints are unsupported'],invalidMimic:['mimic 约束无效','Invalid mimic constraint'],penetration:['碰撞几何穿入地面 · 请调整姿态或地面','Geometry penetrates ground · adjust pose or ground'],airborne:['指定支撑 link 未接地','Specified support link is airborne']};
   function renderTerrain() {
     const active=terrain.active,pending=active&&(Number($('statics-slope-angle').value)!==terrain.angle||Number($('statics-slope-heading').value)!==terrain.heading);
-    $('statics-place-slope').disabled=!model;$('statics-flat').disabled=!active&&!terrain.fit;
+    $('statics-place-slope').disabled=!viewer.robot;$('statics-flat').disabled=!active&&!terrain.fit;
     $('statics-slope-state').textContent=(active?txt(`已放置：${number(terrain.angle,1)}° · 坡向 ${number(terrain.heading,0)}°`,`Placed: ${number(terrain.angle,1)}° · heading ${number(terrain.heading,0)}°`):txt('平地 · 坡向 0° = 场景 +X，90° = +Z','Flat · uphill 0° = scene +X, 90° = +Z'))+(pending?txt(' · 设置已更改，请再次放置',' · settings changed; place again'):'');
     const fit=terrain.fit,placement=$('statics-placement-detail');placement.replaceChildren();
     if(fit){
@@ -257,7 +264,8 @@ window.createStaticsWorkbench=function({THREE,viewer,grid,refreshScene,getModel,
   document.querySelector('.right-tabs').onkeydown=event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const view=event.key==='Home'?'code':event.key==='End'?'statics':rightView==='code'?'statics':'code';$(`right-${view}-tab`).click();$(`right-${view}-tab`).focus();}};
   for(const id of settings)$(id).oninput=()=>{const input=$(id);if(input.value===''||!input.checkValidity()){requestSolve();return;}if(id==='statics-ground')ground=Number(input.value);renderTerrain();requestSolve();};
   $('statics-place-slope').onclick=()=>{
-    if(!validSettings()||!model){requestSolve();return;}
+    if(!validSettings()||!viewer.robot){requestSolve();return;}
+    if(!model||model.version!==getModel().version)buildModel();
     if(!enabled)toggle(true);
     const offset=terrain.place(model.shapes,contactGeometry,Number($('statics-slope-angle').value),Number($('statics-slope-heading').value),{selected:$('statics-contact-mode').value==='manual'?manual:null,tolerance:Number($('statics-tolerance').value)/1000});
     if(offset===null){requestSolve();return;}
@@ -271,7 +279,11 @@ window.createStaticsWorkbench=function({THREE,viewer,grid,refreshScene,getModel,
   window.addEventListener('keydown',event=>{if(event.key==='Escape'&&pinned&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){pinned=null;render();requestProjection();}});
   viewer.addEventListener('angle-change',requestSolve);viewer.controls.addEventListener('change',requestProjection);window.addEventListener('resize',requestProjection);
   return {get enabled(){return enabled;},get view(){return rightView;},get snapshot(){return result?JSON.parse(JSON.stringify({...result,enabled,ground,terrain:terrain.snapshot,selected,inspection:pinned,visibleLabels:[...labels].filter(([,label])=>!label.hidden).map(([name])=>name),leverBreakdown:pinned?engine.leverBreakdown(result,pinned):null,missingMasses:model?.missing||[]})):{enabled,valid:false};},requestSolve,requestProjection,setRightView,selectJoint,
-    modelChanged(){terrain.reset(false);buildModel();result=null;updateEmphasis();refreshAxes();if(enabled)requestSolve();else render();},
+    modelChanged(){
+      terrain.reset(false);model=null;result=null;pinned=null;hovered=null;lastEmphasis=undefined;
+      labels.clear();rows.clear();$('statics-labels').replaceChildren(labelNotice);$('statics-joints').replaceChildren();
+      $('statics-overlay').replaceChildren();ground=null;manual.clear();updateEmphasis();refreshAxes();if(enabled)requestSolve();else render();
+    },
     syncTerrainEnvironment(){terrain.sync();},
     orientationChanged(){terrain.reset();ground=null;refreshScene();requestSolve();renderTerrain();},
     languageChanged(){render();$('statics-contact-mode').options[0].textContent=txt('自动识别','Automatic');$('statics-contact-mode').options[1].textContent=txt('手动指定 link','Manual links');}
