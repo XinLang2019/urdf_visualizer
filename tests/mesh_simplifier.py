@@ -14,7 +14,7 @@ def run(client,url,output):
     client.call('Runtime.enable');client.call('Page.enable');client.call('Network.enable')
     client.call('Emulation.setDeviceMetricsOverride',{'width':1440,'height':1000,'deviceScaleFactor':1,'mobile':False})
     client.call('Page.navigate',{'url':url});client.until('!!window.urdfWorkbench')
-    smoke.check(client,'document.getElementById("mesh-open").disabled','mesh tools are disabled until STL / OBJ files are loaded')
+    smoke.check(client,'document.getElementById("mesh-open").disabled','mesh tools are disabled until STL / OBJ / DAE files are loaded')
     client.js('''(async()=>{
       const T=parcelRequire('../node_modules/three/build/three.module.js'),g=new T.SphereGeometry(1,48,32),p=g.attributes.position,n=g.attributes.normal,uv=g.attributes.uv,idx=g.index;
       const stl=['solid mesh'],obj=['mtllib colors.mtl','o sphere'];

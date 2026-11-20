@@ -1,9 +1,9 @@
 /* Mesh Simplifier UI, comparison preview and explicit source-file commits. */
 (() => {
   'use strict';
-  const $=id=>document.getElementById(id),supported=path=>/\.(stl|obj)$/i.test(path);
+  const $=id=>document.getElementById(id),supported=path=>/\.(stl|obj|dae)$/i.test(path);
   const words={
-    choose:['选择 STL / OBJ 网格…','Choose an STL / OBJ mesh…'],empty:['未加载 STL / OBJ','No STL / OBJ loaded'],open:['简化…','Simplify…'],
+    choose:['选择 STL / OBJ / DAE 网格…','Choose an STL / OBJ / DAE mesh…'],empty:['未加载 STL / OBJ / DAE','No STL / OBJ / DAE loaded'],open:['简化…','Simplify…'],
     original:['原始','Original'],result:['简化后','Simplified'],retain:['保留面数','Keep faces'],target:['目标面数','Target faces'],error:['最大误差 (%)','Max. error (%)'],
     border:['保留边界','Lock borders'],wireframe:['线框','Wireframe'],run:['开始简化','Simplify'],overwrite:['覆盖源文件','Overwrite source'],download:['下载','Download'],
     reading:['读取中…','Reading…'],parsing:['解析中…','Parsing…'],simplifying:['简化中…','Simplifying…'],exporting:['导出中…','Exporting…'],
@@ -13,11 +13,13 @@
     unsupportedSave:['浏览器不支持覆盖源文件，请使用 Chrome / Edge 或下载','Use Chrome / Edge to overwrite, or download the result'],denied:['未获得源文件写入权限','Source write permission was not granted'],
     workerFailed:['无法启动简化器，请通过 HTTP(S) 打开页面','Could not start the simplifier. Open this page over HTTP(S).'],
     invalidNumbers:['模型包含无效数值','The mesh contains invalid numbers'],invalidSTL:['STL 数据不完整','Invalid STL data'],invalidOBJIndex:['OBJ 顶点索引无效','Invalid OBJ vertex index'],
+    invalidDAE:['DAE XML、网格索引或场景引用无效','Invalid DAE XML, mesh indices or scene references'],unsupportedDAE:['暂不支持此 DAE 网格类型，请先转换为静态三角网格','Unsupported DAE mesh data; convert it to a static triangle mesh first'],animatedDAE:['暂不支持带蒙皮、变形或动画的 DAE，请先烘焙为静态网格','Bake skinned, morphed or animated DAE files to a static mesh first'],
     emptyMesh:['模型没有可简化的三角面','The mesh contains no triangles'],emptyResult:['无法生成有效简化结果','Could not produce a valid simplified mesh'],tooLarge:['模型超过 384 MiB 或 800 万面','The mesh exceeds 384 MiB or 8 million faces'],
     invalidSettings:['请设置有效的面数和误差','Enter a valid face count and error'],complexPolygon:['请先将超过 512 个顶点的多边形三角化','Triangulate polygons with more than 512 vertices first'],invalidPolygon:['多边形无法三角化','The polygon cannot be triangulated'],
     mixedAttributes:['OBJ 面的 UV / 法线数据不完整','Incomplete OBJ face UV / normal data'],notTriangles:['仅支持网格，不支持 OBJ 曲线或点云','Only meshes are supported; OBJ curves and point clouds are not supported'],
     weightedOBJ:['请先烘焙 OBJ 齐次坐标','Bake OBJ homogeneous coordinates first'],volumeUV:['暂不支持三维纹理坐标','3D texture coordinates are not supported'],wasmUnsupported:['浏览器不支持 WebAssembly','WebAssembly is unavailable'],
     faces:['面','faces'],vertices:['顶点','vertices'],mtl:['OBJ 下载后请与原 MTL / 贴图放在一起','Keep the downloaded OBJ beside its original MTL / textures'],
+    daeAssets:['DAE 下载后请保持原贴图的相对路径','Keep the original texture paths relative to the downloaded DAE'],
     loaded:['已加载网格','Meshes loaded'],updateFailed:['文件已保存，视图刷新失败，请重新加载模型','File saved; refreshing the view failed. Reload the model.']
   };
   const digest=async file=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await file.arrayBuffer())),v=>v.toString(16).padStart(2,'0')).join('');
@@ -70,7 +72,7 @@
       this.busy=false;$('mesh-progress').hidden=true;
       if(data.type==='error')this.setMessage(data.message,true);
       else if(data.type==='loaded'){
-        this.original={...data.stats,bytes:data.bytes,libraries:data.libraries};this.originalGroup=this.group(data.parts);this.scene.add(this.originalGroup);this.fitPreview();$('mesh-target').max=Math.max(1,this.original.faces-1);$('mesh-target').value=Math.max(1,Math.floor(this.original.faces/2));this.setMessage('ready');
+        this.original={...data.stats,bytes:data.bytes,libraries:data.libraries};this.preview=data.preview;this.originalGroup=this.group(data.parts);this.scene.add(this.originalGroup);this.fitPreview();$('mesh-target').max=Math.max(1,this.original.faces-1);$('mesh-target').value=Math.max(1,Math.floor(this.original.faces/2));this.setMessage('ready');
       }else if(data.type==='simplified'){
         this.result={...data.stats,blob:data.blob,error:data.error};if(this.resultGroup){this.scene.remove(this.resultGroup);this.dispose(this.resultGroup);}this.resultGroup=this.group(data.parts);this.resultGroup.position.copy(this.originalGroup.position);this.scene.add(this.resultGroup);
         this.setMessage(this.result.faces===this.original.faces?'unchanged':this.result.faces>Number($('mesh-target').value)?'limited':'done');
@@ -86,8 +88,8 @@
     count(info){return info?`${info.faces.toLocaleString()} ${this.t('faces')} · ${info.vertices.toLocaleString()} ${this.t('vertices')} · ${this.bytes(info.bytes??info.blob?.size??0)}`:'—';}
     bytes(n){return n>=1048576?(n/1048576).toFixed(2)+' MB':(n/1024).toFixed(1)+' KB';}
     updateCounts(){$('mesh-before-count').textContent=this.count(this.original);$('mesh-after-count').textContent=this.count(this.result);$('mesh-reduction').textContent=this.original&&this.result?`−${((1-this.result.faces/this.original.faces)*100).toFixed(1)}%`:'';}
-    setMessage(key,error=false){this.messageKey=key;this.messageError=error;$('mesh-status').textContent=this.t(key);$('mesh-status').classList.toggle('error',error);$('mesh-note').textContent=this.result&&this.original?.libraries?.length?this.t('mtl'):'';}
-    download(){if(!this.result||this.busy)return;const a=document.createElement('a'),url=URL.createObjectURL(this.result.blob);a.href=url;a.download=this.source.name.replace(/(\.(?:stl|obj))$/i,'.simplified$1');document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);this.setMessage('downloaded');}
+    setMessage(key,error=false){this.messageKey=key;this.messageError=error;$('mesh-status').textContent=this.t(key);$('mesh-status').classList.toggle('error',error);$('mesh-note').textContent=this.result?(/\.dae$/i.test(this.source?.name)?this.t('daeAssets'):this.original?.libraries?.length?this.t('mtl'):''):'';}
+    download(){if(!this.result||this.busy)return;const a=document.createElement('a'),url=URL.createObjectURL(this.result.blob);a.href=url;a.download=this.source.name.replace(/(\.(?:stl|obj|dae))$/i,'.simplified$1');document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);this.setMessage('downloaded');}
     async overwrite(){
       if(!this.result||this.busy||this.writing)return;const source=this.source,result=this.result,baselineHash=this.baselineHash,context=this.selectedContext,path=this.entry.path;let handle=source.handle;
       this.writing=true;this.buttons();
@@ -110,7 +112,20 @@
       this.resize();cancelAnimationFrame(this.frame);const render=()=>{if(!$('mesh-dialog').open)return;this.frame=requestAnimationFrame(render);this.controls.update();const w=this.previewWidth,h=this.previewHeight,mid=Math.floor(w/2),r=this.renderer;r.setScissorTest(true);r.setViewport(0,0,mid,h);r.setScissor(0,0,mid,h);if(this.originalGroup)this.originalGroup.visible=true;if(this.resultGroup)this.resultGroup.visible=false;r.render(this.scene,this.camera);r.setViewport(mid,0,w-mid,h);r.setScissor(mid,0,w-mid,h);if(this.originalGroup)this.originalGroup.visible=!this.resultGroup;if(this.resultGroup)this.resultGroup.visible=true;r.render(this.scene,this.camera);};render();
     }
     resize(){if(!this.renderer)return;const r=$('mesh-preview').getBoundingClientRect();this.previewWidth=Math.max(2,Math.floor(r.width));this.previewHeight=Math.max(2,Math.floor(r.height));this.renderer.setSize(this.previewWidth,this.previewHeight,false);this.camera.aspect=this.previewWidth/2/this.previewHeight;this.camera.updateProjectionMatrix();}
-    group(parts){const T=this.T,group=new T.Group();for(const p of parts){const g=new T.BufferGeometry();g.setAttribute('position',new T.BufferAttribute(p.positions,3));g.setIndex(new T.BufferAttribute(p.indices,1));if(p.normals.length)g.setAttribute('normal',new T.BufferAttribute(p.normals,3));else g.computeVertexNormals();if(p.uvs.length)g.setAttribute('uv',new T.BufferAttribute(p.uvs,2));if(p.colors.length)g.setAttribute('color',new T.BufferAttribute(p.colors,3));const material=new T.MeshPhongMaterial({color:p.colors.length?0xffffff:0xb8d4e8,vertexColors:!!p.colors.length,side:T.DoubleSide,shininess:35,wireframe:$('mesh-wireframe').checked});group.add(new T.Mesh(g,material));}return group;}
+    group(parts){
+      const T=this.T,group=new T.Group();
+      if(this.preview){group.scale.setScalar(this.preview.unit);if(this.preview.up==='Z_UP')group.rotation.x=-Math.PI/2;else if(this.preview.up==='X_UP')group.rotation.z=Math.PI/2;}
+      for(const p of parts){
+        const instances=this.preview?this.preview.instances.filter(i=>i.geometry===p.geometry):[{transforms:[]}];if(!instances.length)continue;
+        const g=new T.BufferGeometry();g.setAttribute('position',new T.BufferAttribute(p.positions,3));g.setIndex(new T.BufferAttribute(p.indices,1));if(p.normals.length)g.setAttribute('normal',new T.BufferAttribute(p.normals,3));else g.computeVertexNormals();if(p.uvs.length)g.setAttribute('uv',new T.BufferAttribute(p.uvs,2));if(p.colors.length)g.setAttribute('color',new T.BufferAttribute(p.colors,3));
+        const material=new T.MeshPhongMaterial({color:p.colors.length?0xffffff:0xb8d4e8,vertexColors:!!p.colors.length,side:T.DoubleSide,shininess:35,wireframe:$('mesh-wireframe').checked});
+        for(const instance of instances){
+          const mesh=new T.Mesh(g,material),matrix=new T.Matrix4();
+          for(const {type,values:v}of instance.transforms){const m=new T.Matrix4();if(type==='matrix')m.fromArray(v).transpose();else if(type==='translate')m.makeTranslation(...v);else if(type==='scale')m.makeScale(...v);else m.makeRotationAxis(new T.Vector3(...v.slice(0,3)).normalize(),v[3]*Math.PI/180);matrix.multiply(m);}
+          mesh.matrix.copy(matrix);mesh.matrixAutoUpdate=false;group.add(mesh);
+        }
+      }return group;
+    }
     fitPreview(){const T=this.T,box=new T.Box3().setFromObject(this.originalGroup),center=box.getCenter(new T.Vector3()),radius=Math.max(box.getSize(new T.Vector3()).length()/2,1e-6);this.originalGroup.position.copy(center).negate();this.camera.near=radius/1000;this.camera.far=radius*1000;const distance=radius/Math.sin(this.camera.fov*Math.PI/360)/Math.min(1,this.camera.aspect);this.camera.position.set(.65,.45,1).normalize().multiplyScalar(distance*1.08);this.controls.target.set(0,0,0);this.camera.updateProjectionMatrix();this.controls.update();}
     get snapshot(){return {files:[...this.entries.keys()],busy:this.busy,writing:this.writing,original:this.original?{faces:this.original.faces,vertices:this.original.vertices}:null,result:this.result?{faces:this.result.faces,vertices:this.result.vertices,bytes:this.result.blob.size}:null};}
   };

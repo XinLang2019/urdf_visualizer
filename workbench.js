@@ -561,7 +561,7 @@
     try {
       const models=files.filter(file=>URDFModelFormats.isModel(file.name));
       const hasModel=models.some(file=>!/\.xml$/i.test(file.name))||(await Promise.all(models.map(file=>URDFModelFormats.detect(file)))).some(Boolean);
-      if(!hasModel&&files.some(file=>/\.(stl|obj)$/i.test(file.name))){
+      if(!hasModel&&files.some(file=>/\.(stl|obj|dae)$/i.test(file.name))){
         const assets=new Map(files.map(file=>[normalize(file.webkitRelativePath||file._relativePath||file.name),sourceFiles.fromFile(file)]));
         meshSimplifier.setContext({assets});status(meshSimplifier.t('loaded'));return;
       }
@@ -679,7 +679,7 @@
           const name=document.createElement('span');name.textContent=entry.name;
           summary.append(icon,name);folder.append(summary);parent.append(folder);append(entry,folder,depth+1);
         }else{
-          const isRobot=URDFModelFormats.isModel(entry.name),isMesh=/\.(stl|obj)$/i.test(entry.name);
+          const isRobot=URDFModelFormats.isModel(entry.name),isMesh=/\.(stl|obj|dae)$/i.test(entry.name);
           const row=document.createElement(isRobot||isMesh?'button':'div');
           row.className='file-entry';row.dataset.path=entry.path;row.setAttribute('role','treeitem');
           row.setAttribute('aria-selected',String(entry.path===active));row.classList.toggle('selected',entry.path===active);

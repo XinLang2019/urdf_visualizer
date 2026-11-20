@@ -46,7 +46,7 @@ def run(client,url,output):
     print('PASS old unversioned CSS and workbench JS are genuinely retained in browser cache',flush=True)
     client.call('Page.navigate',{'url':url});client.until('!!window.urdfWorkbench')
     smoke.check(client,'!window.__legacyMeshScript','updated page loads the current workbench even with a warm legacy cache')
-    smoke.check(client,'document.querySelector("#mesh-source option").textContent==="未加载 STL / OBJ"&&document.getElementById("mesh-source").disabled','empty mesh selector displays a clear initialized state')
+    smoke.check(client,'document.querySelector("#mesh-source option").textContent==="未加载 STL / OBJ / DAE"&&document.getElementById("mesh-source").disabled','empty mesh selector displays a clear initialized state')
     for width in [300,440]:
         client.js('document.body.style.setProperty("--side",'+json.dumps(str(width)+'px')+')')
         rendered_frame(client)

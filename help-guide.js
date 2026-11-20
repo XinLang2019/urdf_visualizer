@@ -16,7 +16,7 @@
           lines:['调好站姿，开启“受力分析”；点击力矩标签查看力与力臂，再次点击恢复。','设置坡度、坡向和摩擦系数，点击“一键贴合斜坡”，查看机身角度与轮轴力矩。']}
       ],
       formatsTitle:'格式转换与 STEP 装配',formatsNote:'文件栏选择 URDF / MJCF / USD 转换下载 ZIP。选择 STEP 可导出保留连杆层级的零位静态装配，单位为 mm，网格保留为三角面几何。在线版无需 Python；USD 导出为文本 .usda。MJCF / 文本 USDA 编辑原格式代码；保存写入授权源文件，重新加载后生效。',
-      meshTitle:'Mesh Simplifier',meshNote:'文件栏选择已加载的 STL / OBJ，设置目标面数并对比预览，再覆盖源文件或下载。也可单独加载网格文件夹。',
+      meshTitle:'Mesh Simplifier',meshNote:'文件栏选择已加载的 STL / OBJ / DAE，设置目标面数并对比预览，再覆盖源文件或下载。也可单独加载网格文件夹。',
       saveTitle:'编辑与保存',save:'应用代码到模型',write:'保存回源文件',
       saveNote:'编辑器内 Ctrl + S 保存源文件。首次保存可能需要授权，保存后需重新加载以应用修改。',
       controlsTitle:'视图快捷操作',
@@ -38,7 +38,7 @@
           lines:['Set a standing pose and enable Statics. Click a torque label for forces and moment arms; click again to restore labels.','Set slope angle, heading, and friction, then Fit supports to slope. Inspect body attitude and wheel holding torques.']}
       ],
       formatsTitle:'Format conversion & STEP assembly',formatsNote:'Convert URDF / MJCF / USD in Files and download a ZIP. STEP exports a static zero-pose assembly retaining the link tree, in mm; mesh geometry stays faceted. No Python is required online. USD exports as text .usda. MJCF / text USDA edits use original source; Save writes the authorized file and Reload applies edits.',
-      meshTitle:'Mesh Simplifier',meshNote:'Select a loaded STL / OBJ in Files, set the target face count and compare previews, then overwrite the source or download. Standalone mesh folders work too.',
+      meshTitle:'Mesh Simplifier',meshNote:'Select a loaded STL / OBJ / DAE in Files, set the target face count and compare previews, then overwrite the source or download. Standalone mesh folders work too.',
       saveTitle:'Edit & save',save:'Apply code to model',write:'Save back to source',
       saveNote:'Ctrl + S saves source in the editor. Saving may need permission. Reload to apply saved code to the model.',
       controlsTitle:'View controls',
