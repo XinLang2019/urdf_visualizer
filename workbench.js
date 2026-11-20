@@ -361,12 +361,12 @@
   function arrangeModels(){
     let edge=null;const gap=Number($('model-gap').value);
     if(!Number.isFinite(gap)||gap<0)return;
-    // Offsets are expressed in model/world XYZ before the viewer's up-axis rotation.
+    // Arrange along model Y before the viewer's up-axis rotation.
     for(const model of models){
       model.group.position.set(0,0,0);viewer.world.updateWorldMatrix(true,true);
       const box=objectBounds(model.robot).applyMatrix4(viewer.world.matrixWorld.clone().invert());
-      if(edge!==null)model.group.position.x=edge+gap-(box.isEmpty()?-.5:box.min.x);
-      edge=model.group.position.x+(box.isEmpty()?.5:box.max.x);
+      if(edge!==null)model.group.position.y=edge+gap-(box.isEmpty()?-.5:box.min.y);
+      edge=model.group.position.y+(box.isEmpty()?.5:box.max.y);
     }
     refreshModelVisibility();fitView();statics?.modelChanged();
   }
@@ -487,7 +487,7 @@
       const inverse=viewer.world.matrixWorld.clone().invert(),box=objectBounds(robot).applyMatrix4(inverse),others=new THREE.Box3();
       for(const model of models)if(model!==activeModel)others.union(objectBounds(model.robot).applyMatrix4(inverse));
       const gap=Number($('model-gap').value);
-      activeModel.group.position.x=(others.isEmpty()?0:others.max.x)+(Number.isFinite(gap)&&gap>=0?gap:.5)-(box.isEmpty()?-.5:box.min.x);
+      activeModel.group.position.y=(others.isEmpty()?0:others.max.y)+(Number.isFinite(gap)&&gap>=0?gap:.5)-(box.isEmpty()?-.5:box.min.y);
     }
     refreshModelVisibility();
     fitView();updateEditor();statics?.modelChanged();

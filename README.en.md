@@ -29,7 +29,7 @@ URDF / MJCF / text USDA loading and conversion work directly on GitHub Pages and
 - **Joint control**: pose robots by dragging links or sliders; joint limits and degrees / radians. Double-click a link to locate its joint and code.
 - **Visual helpers**: visual and collision geometry, centers of mass, equivalent inertia boxes, link frames, and joint axes. Light / dark themes and Chinese / English UI.
 - **3D measurement**: point-to-point or link-origin distance with XYZ components, with up to 5 geometric snap candidates.
-- **Multiple models**: switch or close models with the left model tabs; models appear side by side by default. Reset the arrangement or set relative XYZ offsets in metres under Position. Clicking a 3D model selects its source; drafts and joint poses stay separate.
+- **Multiple models**: switch or close models with the left model tabs; models appear side by side along the model Y axis by default. Reset the arrangement or set relative XYZ offsets in metres under Position. Clicking a 3D model selects its source; drafts and joint poses stay separate.
 - **Edit and save**: original URDF, MJCF and text USDA source, syntax highlighting, validation, reload, and saving directly to the matching source file.
 - **Statics**: live joint torques, contact reactions, and moment arms. Configure slope and friction, fit wheels / feet to the ground, and solve body attitude.
 

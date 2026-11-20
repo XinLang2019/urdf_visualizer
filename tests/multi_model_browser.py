@@ -61,7 +61,7 @@ def run(client,url,output):
     client.until('!document.getElementById("editor-error").hidden')
     check('urdfWorkbench.viewer.robot===goodRobot&&urdfWorkbench.models.length===3','invalid native code preserves the current and other models')
     client.js('document.getElementById("source").value=goodUsd;document.getElementById("source").dispatchEvent(new Event("input"));if(!document.getElementById("models-show-all").checked)document.getElementById("models-show-all").click()')
-    check('urdfWorkbench.models.every(m=>m.visible)&&urdfWorkbench.models[2].offset[0]>urdfWorkbench.models[1].offset[0]','show-all renders every model with automatic non-overlapping offsets')
+    check('urdfWorkbench.models.every(m=>m.visible)&&urdfWorkbench.models[2].offset[1]>urdfWorkbench.models[1].offset[1]&&urdfWorkbench.models.every(m=>m.offset[0]===0&&m.offset[2]===0)','show-all renders every model with automatic non-overlapping offsets')
     client.js('document.getElementById("model-spacing-toggle").click();document.getElementById("model-reference").value=urdfWorkbench.models[0].id;document.getElementById("model-reference").dispatchEvent(new Event("change"));for(const [a,n]of [["x",2],["y",.6],["z",.4]]){const i=document.getElementById("model-offset-"+a);i.value=n;i.dispatchEvent(new Event("change"));}document.getElementById("fit-view").click()')
     check('JSON.stringify(urdfWorkbench.models[2].offset)===JSON.stringify([2,.6,.4])&&document.getElementById("model-distance").textContent.includes("2.126")','relative XYZ placement and measured origin distance use metres')
     # Large native files highlight only the visible lines while retaining complete editable text.
@@ -88,6 +88,8 @@ def run(client,url,output):
     check('urdfWorkbench.models.length===0&&!urdfWorkbench.viewer.robot&&document.getElementById("source").value===""','removing the last model clears editor and model-specific tools')
     upload(client,{'all/one.urdf':URDF,'all/two.urdf':URDF.replace('first','second')},'加载全部模型')
     check('urdfWorkbench.models.length===2&&urdfWorkbench.models.every(m=>m.visible)','Load all imports multiple model descriptions and displays them together')
+    client.js('document.getElementById("models-arrange").click()')
+    check('urdfWorkbench.models.every(m=>m.offset[0]===0&&m.offset[2]===0)&&Math.abs(urdfWorkbench.models[1].offset[1]-urdfWorkbench.models[0].offset[1]-.8)<1e-8','reset side by side places known 0.3 m wide models along model Y with a 0.5 m gap')
     assert not [e for e in client.events if e.get('method')=='Runtime.exceptionThrown']
     print('PASS no uncaught browser exceptions',flush=True)
 
