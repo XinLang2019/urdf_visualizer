@@ -7,7 +7,7 @@
       steps:['加载机器人','调整姿态','测量与分析'],
       cards:[
         {title:'加载与浏览',image:'workbench.png',alt:'Go2 模型、左侧工作栏和右侧代码编辑器',
-          lines:['选择内置示例，或拖入 URDF / MJCF / USD 完整模型文件夹。MJCF / 文本 USDA 在浏览器本地处理，无需安装。','左侧模型标签可切换、关闭，默认沿 Y 轴并排显示多个模型；“位置”设置相对 XYZ 距离。点击三维模型切换其代码。']},
+          lines:['选择内置示例，或拖入 URDF / MJCF / USD 完整模型文件夹。MJCF / 文本 USDA 在浏览器本地处理，无需安装。','左侧模型标签可切换、关闭，默认沿 Y 轴并排显示多个模型；“位置”调整 XYZ 位置与间隙。点击三维模型切换其代码。']},
         {title:'关节与辅助显示',image:'joint-control.png',alt:'拖动关节后，在轴旁输入目标关节角度',
           lines:['拖动连杆或关节滑块调姿；点击轴旁数值输入目标角度，自动遵守限位。','双击连杆定位关节与代码；顶部可开启质心、惯量、坐标轴和关节轴。']},
         {title:'两种三维测量',image:'measurement.png',alt:'黄色总距离及红绿蓝 XYZ 分量标注',
@@ -29,7 +29,7 @@
       steps:['Load a robot','Set a pose','Measure & analyze'],
       cards:[
         {title:'Load & explore',image:'workbench.png',alt:'Go2 model with the left workspace and right code editor',
-          lines:['Choose an example or drop a complete URDF / MJCF / USD folder. MJCF / text USDA runs locally in your browser.','Switch or close models with the left tabs; models appear side by side along the model Y axis by default. Position sets relative XYZ offsets; click a 3D model to select its code.']},
+          lines:['Choose an example or drop a complete URDF / MJCF / USD folder. MJCF / text USDA runs locally in your browser.','Switch or close models with the left tabs; models appear side by side along the model Y axis by default. Position sets XYZ placement and spacing; click a 3D model to select its code.']},
         {title:'Joints & visual helpers',image:'joint-control.png',alt:'Enter a target joint angle beside the joint axis',
           lines:['Drag a link or joint slider to pose the robot. Click the axis readout to enter a target within joint limits.','Double-click a link to locate its joint and code. Toggle CoM, inertia, frames, and joint axes in the toolbar.']},
         {title:'Two ways to measure',image:'measurement.png',alt:'Total distance in yellow with red, green, and blue XYZ components',

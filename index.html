@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#2E6B8A">
-  <title>URDF-Viewer</title><link rel="icon" type="image/svg+xml" href="assets/robot.svg"><link rel="stylesheet" href="workbench.css?v=85a8e1e736b6">
+  <title>URDF-Viewer</title><link rel="icon" type="image/svg+xml" href="assets/robot.svg"><link rel="stylesheet" href="workbench.css?v=d63ae5cc7f04">
 </head>
 <body>
   <main id="viewport" aria-label="机器人三维视图"><urdf-viewer up="+Z" display-shadow tabindex="0" aria-label="三维模型：左键旋转，右键平移，滚轮缩放"></urdf-viewer></main>
@@ -24,9 +24,17 @@
       <button id="sidebar-toggle" aria-label="收起工作栏" title="收起 / 展开工作栏" aria-expanded="true" aria-controls="workspace-content">‹</button>
     </nav>
     <section id="model-manager" class="model-manager" hidden aria-label="模型管理">
-      <div class="model-tabs-row"><div id="model-tabs" role="tablist" aria-label="已加载模型"></div><button id="model-add" type="button" title="添加模型" aria-label="添加模型">＋</button></div>
-      <div class="model-manager-row"><label class="model-show-all"><input id="models-show-all" type="checkbox" checked><span data-i18n="showAllModels">同时显示</span></label><button id="file-tools-toggle" type="button" aria-expanded="false" title="内置示例与文件夹" data-i18n="modelLoadOptions" hidden>加载选项</button><button id="model-spacing-toggle" type="button" aria-expanded="false" aria-controls="model-spacing" data-i18n="modelPosition">位置</button></div>
-      <div id="model-spacing" hidden><div class="model-position-actions"><button id="models-arrange" type="button" data-i18n="arrangeModels">恢复并排</button></div><select id="model-reference" aria-label="参考模型"></select><p data-i18n="modelPositionHint">相对参考模型原点的 XYZ 偏移（m）</p><div class="model-offsets"><label>X<input id="model-offset-x" type="number" step="0.1" value="0"></label><label>Y<input id="model-offset-y" type="number" step="0.1" value="0"></label><label>Z<input id="model-offset-z" type="number" step="0.1" value="0"></label></div><div class="model-manager-row"><label class="model-gap"><span data-i18n="modelGap">排列间隙</span><input id="model-gap" type="number" min="0" step="0.1" value="0.5"><span>m</span></label><output id="model-distance"></output></div></div>
+      <div class="model-tabs-row">
+        <div id="model-tabs" role="tablist" aria-label="已加载模型"></div>
+        <button id="model-add" type="button" title="添加模型" aria-label="添加模型" aria-haspopup="menu" aria-expanded="false" aria-controls="model-add-menu">＋</button>
+        <div id="model-add-menu" role="menu" aria-labelledby="model-add" hidden>
+          <button id="model-add-files" type="button" role="menuitem" tabindex="-1" data-i18n="addFiles">添加文件</button>
+          <button id="model-add-folder" type="button" role="menuitem" tabindex="-1" data-i18n="addFolder">添加文件夹</button>
+          <button id="model-add-example" type="button" role="menuitem" tabindex="-1" data-i18n="addExample">内置示例</button>
+        </div>
+      </div>
+      <div class="model-manager-row"><label class="model-show-all"><input id="models-show-all" type="checkbox" checked><span data-i18n="showAllModels">同时显示</span></label><button id="models-arrange" type="button" data-i18n="arrangeModels">恢复并排</button><button id="model-spacing-toggle" type="button" aria-expanded="false" aria-controls="model-spacing" data-i18n="modelPosition">位置</button></div>
+      <div id="model-spacing" hidden><div class="model-offsets"><label>X<input id="model-offset-x" type="number" step="0.1" value="0" aria-label="X 位置（m）" title="X（m）"></label><label>Y<input id="model-offset-y" type="number" step="0.1" value="0" aria-label="Y 位置（m）" title="Y（m）"></label><label>Z<input id="model-offset-z" type="number" step="0.1" value="0" aria-label="Z 位置（m）" title="Z（m）"></label><label class="model-gap"><span data-i18n="modelGap">间隙</span><input id="model-gap" type="number" min="0" step="0.1" value="0.5" aria-label="排列间隙（m）" title="排列间隙（m）"></label></div></div>
     </section>
     <div id="workspace-content" class="workspace-content">
   <aside id="files-panel" class="panel panel-files" role="tabpanel" aria-labelledby="tab-files">
@@ -124,7 +132,7 @@
     <footer class="mesh-footer"><div class="mesh-feedback"><progress id="mesh-progress" max="1" value="0" hidden></progress><p id="mesh-status" role="status"></p><p id="mesh-note"></p></div><div class="button-row"><button id="mesh-overwrite" data-mesh-i18n="overwrite" disabled>覆盖源文件</button><button id="mesh-download" class="active" data-mesh-i18n="download" disabled>下载</button></div></footer>
   </dialog>
   <dialog id="help-dialog" aria-labelledby="help-title"><div class="dialog-header"><div class="help-heading"><img src="assets/robot.svg" width="42" height="42" alt=""><div><span class="help-brand">URDF-Viewer</span><h2 id="help-title" data-i18n="helpTitle">使用指南</h2></div></div><button id="close-help" type="button" aria-label="关闭帮助" autofocus>×</button></div><div id="help-content"></div><footer class="help-footer"><span id="help-footer-hint"></span><button id="restore-layout" data-i18n="restoreLayout">恢复面板布局</button></footer></dialog>
-  <script src="src.a2b27638.js?v=b322af4b7256"></script><script src="measurement-features.js?v=9bfe43c9498f"></script><script src="statics-core.js?v=bf9fd1fab8b2"></script><script src="statics-contacts.js?v=6f384d8c423c"></script><script src="statics-annotations.js?v=f4912aa1c6fb"></script><script src="statics-terrain.js?v=a4db0ed43fe0"></script><script src="statics-workbench.js?v=4b2b054e9eea"></script><script src="source-files.js?v=7f5ff93d7996"></script><script src="help-guide.js?v=79dafad3cdf6"></script><script src="browser-step-export.js?v=ca644f8a9202"></script><script src="browser-model-formats.js?v=8690c5953a83"></script><script src="model-formats.js?v=9eaf6cf79445"></script><script src="mesh-simplifier.js?v=daa9a6ef0abf" data-mesh-worker="mesh-simplifier-worker.js?v=e420997a0b9c"></script><script src="workbench.js?v=c92c4deaafc7"></script>
+  <script src="src.a2b27638.js?v=b322af4b7256"></script><script src="measurement-features.js?v=9bfe43c9498f"></script><script src="statics-core.js?v=bf9fd1fab8b2"></script><script src="statics-contacts.js?v=6f384d8c423c"></script><script src="statics-annotations.js?v=f4912aa1c6fb"></script><script src="statics-terrain.js?v=a4db0ed43fe0"></script><script src="statics-workbench.js?v=4b2b054e9eea"></script><script src="source-files.js?v=7f5ff93d7996"></script><script src="help-guide.js?v=2cd7e91db787"></script><script src="browser-step-export.js?v=ca644f8a9202"></script><script src="browser-model-formats.js?v=8690c5953a83"></script><script src="model-formats.js?v=9eaf6cf79445"></script><script src="mesh-simplifier.js?v=daa9a6ef0abf" data-mesh-worker="mesh-simplifier-worker.js?v=e420997a0b9c"></script><script src="workbench.js?v=eac2c0d41e2d"></script>
   <!-- Cloudflare Web Analytics -->
   <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "b7a43469604d4a53a9cb6f90411b0459"}'></script>
   <!-- End Cloudflare Web Analytics -->

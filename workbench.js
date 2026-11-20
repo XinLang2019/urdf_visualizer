@@ -159,8 +159,7 @@
   };
   Object.assign(strings,{
     showAllModels:['同时显示','Show all'],arrangeModels:['恢复并排','Reset side by side'],modelPosition:['位置','Position'],
-    modelPositionHint:['相对参考模型原点的 XYZ 偏移（m）','XYZ offset from the reference model origin (m)'],modelGap:['排列间隙','Gap'],
-    modelOriginDistance:['原点距离','Origin distance'],modelLoadOptions:['加载选项','Load options']
+    modelGap:['间隙','Gap'],addFiles:['添加文件','Add files'],addFolder:['添加文件夹','Add folder'],addExample:['内置示例','Examples']
   });
   const nativeFormats=new URLSearchParams(location.search).get('formats')==='native';
   let lang = 'zh';
@@ -345,14 +344,7 @@
     }
     if(focused&&!document.activeElement?.dataset.modelId)tabList.querySelector(`button[data-model-id="${focused}"]`)?.focus({preventScroll:true});
     $('models-show-all').disabled=models.length<2;$('models-arrange').disabled=models.length<2;
-    const previous=$('model-reference').value,references=models.filter(m=>m!==activeModel);
-    $('model-reference').replaceChildren(...references.map(m=>{const option=document.createElement('option');option.value=m.id;option.textContent=m.context.name;return option;}));
-    if(references.some(m=>m.id===previous))$('model-reference').value=previous;
-    $('model-reference').disabled=!references.length;
-    const reference=models.find(m=>m.id===$('model-reference').value),origin=reference?.group.position||new THREE.Vector3();
-    for(const axis of ['x','y','z'])$('model-offset-'+axis).value=activeModel?Number((activeModel.group.position[axis]-origin[axis]).toFixed(6)):0;
-    const distance=activeModel?activeModel.group.position.distanceTo(origin):0;
-    $('model-distance').textContent=`${t('modelOriginDistance')}: ${distance.toFixed(3)} m`;
+    for(const axis of ['x','y','z'])$('model-offset-'+axis).value=activeModel?Number(activeModel.group.position[axis].toFixed(6)):0;
   }
   function refreshModelVisibility({display=true,environment=true}={}){
     for(const model of models)model.group.visible=$('models-show-all').checked||model===activeModel;
@@ -403,12 +395,31 @@
   };
   $('models-show-all').onchange=()=>{refreshModelVisibility();fitView();};
   $('models-arrange').onclick=arrangeModels;
-  $('model-reference').onchange=refreshModelManager;
-  $('model-add').onclick=()=>pickLocal(false);
+  function toggleModelAdd(open){
+    $('model-add-menu').hidden=!open;$('model-add').setAttribute('aria-expanded',String(open));
+    if(open)$('model-add-menu').firstElementChild.focus();
+  }
+  $('model-add').onclick=()=>toggleModelAdd($('model-add-menu').hidden);
+  for(const [id,folder]of [['model-add-files',false],['model-add-folder',true]])$(id).onclick=()=>{toggleModelAdd(false);$('model-add').focus();pickLocal(folder);};
+  $('model-add-example').onclick=()=>{
+    toggleModelAdd(false);setPanel('files',true);
+    const visible=$('files-panel').classList.toggle('show-import');
+    (visible?$('example-select'):$('model-add')).focus();
+  };
+  $('model-add').onkeydown=event=>{if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();toggleModelAdd(true);if(event.key==='ArrowUp')$('model-add-menu').lastElementChild.focus();}};
+  $('model-add-menu').onkeydown=event=>{
+    const items=[...$('model-add-menu').children],index=items.indexOf(document.activeElement);
+    if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){
+      event.preventDefault();items[event.key==='Home'?0:event.key==='End'?items.length-1:(index+(event.key==='ArrowUp'?items.length-1:1))%items.length].focus();
+    }
+  };
+  document.addEventListener('pointerdown',event=>{if(!$('model-add-menu').contains(event.target)&&!$('model-add').contains(event.target))toggleModelAdd(false);});
+  document.addEventListener('focusin',event=>{if(!$('model-add-menu').contains(event.target)&&event.target!==$('model-add'))toggleModelAdd(false);});
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('model-add-menu').hidden){event.preventDefault();event.stopPropagation();toggleModelAdd(false);$('model-add').focus();}});
   $('model-spacing-toggle').onclick=()=>{const open=$('model-spacing').hidden;$('model-spacing').hidden=!open;$('model-spacing-toggle').setAttribute('aria-expanded',String(open));};
   for(const axis of ['x','y','z'])$('model-offset-'+axis).onchange=()=>{
     const input=$('model-offset-'+axis),value=Number(input.value);if(!activeModel||input.value===''||!Number.isFinite(value)){refreshModelManager();return;}
-    clearMeasurement();clearJointAngleUI();const reference=models.find(m=>m.id===$('model-reference').value);activeModel.group.position[axis]=value+(reference?.group.position[axis]||0);refreshModelManager();viewer._updateEnvironment();viewer.redraw();statics?.modelChanged();
+    clearMeasurement();clearJointAngleUI();activeModel.group.position[axis]=value;refreshModelManager();viewer._updateEnvironment();viewer.redraw();statics?.modelChanged();
   };
   function removeModel(model=activeModel){
     if(!model||state.saving)return;
@@ -421,7 +432,7 @@
       clearActiveTools();models.splice(index,1);activeModel=null;dispose(removed.group);releaseContext(removed.context);
       viewer.robot=null;state.context=null;state.source='';state.xml=null;state.helpers=[];state.rows.clear();state.baseline='';++state.version;
       $('source').value='';$('filename').value='newfile.urdf';document.body.classList.remove('model-loaded');$('files-panel').classList.remove('has-model','show-import');
-      for(const id of ['loaded-file','file-tree','file-tools-toggle','joint-content','structure-count','tree','selection-info'])$(id).hidden=true;
+      for(const id of ['loaded-file','file-tree','joint-content','structure-count','tree','selection-info'])$(id).hidden=true;
       for(const id of ['joints-empty','structure-empty'])$(id).hidden=false;
       $('file-tree').replaceChildren();$('joint-list').replaceChildren();$('tree').replaceChildren();$('graph-measure').disabled=true;
       meshSimplifier.setContext(null);refreshModelManager();updateEditor();statics?.modelChanged();viewer.redraw();status(t('ready'));
@@ -682,14 +693,8 @@
     }
     append(root,$('file-tree'),0);
     $('file-tree').hidden=false;
-    $('file-tools-toggle').hidden=false;
     $('files-panel').classList.remove('show-import');
-    $('file-tools-toggle').setAttribute('aria-expanded','false');
   }
-  $('file-tools-toggle').onclick=()=>{
-    const visible=$('files-panel').classList.toggle('show-import');
-    $('file-tools-toggle').setAttribute('aria-expanded',String(visible));
-  };
 
   // Preserve source sibling order and traverse each complete kinematic chain.
   function buildHierarchy() {

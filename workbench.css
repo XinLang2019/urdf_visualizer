@@ -230,8 +230,8 @@ urdf-viewer canvas {
   overflow:hidden;
   border-radius:0 0 14px 14px;
 }
-.model-manager {padding:0 8px 7px;border-bottom:1px solid var(--line);flex-shrink:0;min-width:0;}
-.model-tabs-row {display:flex;align-items:center;gap:4px;min-width:0;margin-bottom:6px;padding-top:7px;}
+.model-manager {position:relative;z-index:11;padding:0 8px 7px;border-bottom:1px solid var(--line);flex-shrink:0;min-width:0;}
+.model-tabs-row {position:relative;display:flex;align-items:center;gap:4px;min-width:0;margin-bottom:6px;padding-top:7px;}
 #model-tabs {display:flex;flex:1;min-width:0;gap:3px;overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--line) transparent;}
 .model-tab {display:flex;align-items:center;flex:0 1 146px;min-width:110px;max-width:166px;position:relative;border:1px solid transparent;border-bottom-color:var(--line);border-radius:8px 8px 0 0;background:var(--surface-soft);}
 .model-tab.is-active {background:var(--selection);border-color:var(--line);border-bottom-color:var(--blue);}
@@ -240,12 +240,13 @@ urdf-viewer canvas {
 .model-manager .model-tab-close:hover {background:var(--hover);color:var(--text);}
 .model-tab.is-active .model-tab-select {color:var(--text);font-weight:600;}
 #model-add {flex:0 0 26px;padding:0;border-color:transparent;border-radius:7px;font-size:19px;}
-.model-position-actions {display:flex;justify-content:flex-end;margin-bottom:6px;}
+#model-add-menu {position:absolute;right:0;top:100%;z-index:5;min-width:132px;padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 12px var(--shadow);}
+#model-add-menu button {display:block;width:100%;border:0;border-radius:4px;background:transparent;text-align:left;padding:7px 10px;font-size:12px;}
+#model-add-menu button:hover,#model-add-menu button:focus-visible {background:var(--hover);}
 .model-manager .model-manager-row {padding:0 1px;}
 .model-manager .model-show-all {font-size:11px;}
 .panel-files>.panel-header {display:none;}
-.model-manager #file-tools-toggle {padding:2px 7px;min-height:24px;font-size:11px;}
-.model-manager #model-spacing-toggle {padding:2px 7px;min-height:24px;font-size:11px;}
+.model-manager #models-arrange,.model-manager #model-spacing-toggle {padding:2px 7px;min-height:24px;font-size:11px;}
 
 .model-manager-row {display:flex;align-items:center;gap:6px;min-width:0;}
 .model-manager-row+.model-manager-row {margin-top:6px;}
@@ -253,14 +254,11 @@ urdf-viewer canvas {
 .model-manager-row>select {flex:1;}
 .model-manager button {padding:4px 8px;min-height:28px;white-space:nowrap;}
 .model-show-all {display:flex;align-items:center;gap:4px;margin-right:auto;white-space:nowrap;font-size:12px;}
-.model-offsets {display:flex;gap:8px;}
-.model-offsets label {display:flex;align-items:center;gap:4px;min-width:0;font-size:12px;}
-.model-offsets input {width:100%;min-width:0;padding:4px;}
+.model-offsets {display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) minmax(0,1.25fr);gap:6px;}
+.model-offsets label {display:flex;align-items:center;gap:4px;min-width:0;white-space:nowrap;font-size:11px;}
+.model-offsets input {width:100%;min-width:0;padding:4px;font-size:11px;appearance:textfield;}
+.model-offsets input::-webkit-inner-spin-button,.model-offsets input::-webkit-outer-spin-button {appearance:none;margin:0;}
 #model-spacing {padding-top:8px;}
-#model-spacing p {font-size:11px;color:var(--muted);margin:6px 0;}
-.model-gap {display:flex;align-items:center;gap:4px;white-space:nowrap;font-size:11px;}
-.model-gap input {width:50px;padding:4px;}
-#model-distance {font-size:11px;color:var(--muted);margin-left:auto;}
 .workspace-sidebar.collapsed .model-manager {display:none;}
 .workspace-content>.panel {
   position:relative;
